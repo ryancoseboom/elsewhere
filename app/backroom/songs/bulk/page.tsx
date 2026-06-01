@@ -14,11 +14,24 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-function splitList(value: FormDataEntryValue | null) {
-  return String(value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+async function createUniqueSlug(baseSlug: string) {
+  const supabase = await createClient();
+
+  let slug = baseSlug;
+  let counter = 2;
+
+  while (true) {
+    const { data } = await supabase
+      .from("artifacts")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (!data) return slug;
+
+    slug = `${baseSlug}-${counter}`;
+    counter += 1;
+  }
 }
 
 function getFileExtension(fileName: string) {
@@ -57,101 +70,14 @@ async function uploadArtifactFile({
   return data.publicUrl;
 }
 
-async function createUniqueSlug(baseSlug: string) {
-  const supabase = await createClient();
-
-  let slug = baseSlug;
-  let counter = 2;
-
-  while (true) {
-    const { data } = await supabase
-      .from("artifacts")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (!data) return slug;
-
-    slug = `${baseSlug}-${counter}`;
-    counter += 1;
-  }
-}
-
-async function bulkCreateSongs(formData: FormData) {
-  "use server";
-
-  const supabase = await createClient();
-
-  const audioFiles = formData
-    .getAll("audio_files")
-    .filter((file): file is File => file instanceof File && file.size > 0);
-
-  if (audioFiles.length === 0) {
-    throw new Error("Please choose at least one audio file.");
-  }
-
-  const sharedCoverFile = formData.get("shared_cover_file");
-
-  const album = String(formData.get("album") || "").trim();
-  const year = String(formData.get("year") || "").trim();
-  const era = String(formData.get("era") || "").trim();
-  const rooms = splitList(formData.get("rooms"));
-  const motifs = splitList(formData.get("motifs"));
-  const atmosphere = splitList(formData.get("atmosphere"));
-
-  for (let index = 0; index < audioFiles.length; index++) {
-    const audioFile = audioFiles[index];
-
-    const rawTitle =
-      String(formData.get(`title_${index}`) || "").trim() ||
-      audioFile.name.replace(/\.[^/.]+$/, "");
-
-    const baseSlug = slugify(rawTitle);
-    const slug = await createUniqueSlug(baseSlug);
-
-    const audio_url = await uploadArtifactFile({
-      file: audioFile,
-      folder: "audio",
-      slug,
-    });
-
-    const image_url =
-      sharedCoverFile instanceof File && sharedCoverFile.size > 0
-        ? await uploadArtifactFile({
-            file: sharedCoverFile,
-            folder: "images",
-            slug,
-          })
-        : "";
-
-    const { error } = await supabase.from("artifacts").insert({
-      title: rawTitle,
-      slug,
-      kind: "Song",
-      album,
-      year,
-      era,
-      rooms,
-      motifs,
-      atmosphere,
-      audio_url,
-      image_url,
-      is_public: true,
-    });
-
-    if (error) throw new Error(error.message);
-  }
-
-  redirect("/backroom");
-}
-
 async function createSong(formData: FormData) {
   "use server";
 
   const supabase = await createClient();
 
   const title = String(formData.get("title") || "").trim();
-  const slug = slugify(String(formData.get("slug") || title));
+  const baseSlug = slugify(String(formData.get("slug") || title));
+const slug = await createUniqueSlug(baseSlug);
 
   if (!title || !slug) {
     throw new Error("Title and slug are required.");

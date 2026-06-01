@@ -24,3 +24,283 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes elsewhere-float-row {
+  0% {
+    opacity: var(--float-row-opacity);
+    transform: translate3d(var(--float-row-from), 0, 0);
+  }
+
+  43% {
+    opacity: 1;
+    transform: translate3d(var(--float-row-mid), 0, 0);
+  }
+
+  71% {
+    opacity: 0.52;
+  }
+
+  100% {
+    opacity: 0.9;
+    transform: translate3d(var(--float-row-to), 0, 0);
+  }
+}
+
+@keyframes elsewhere-float-column {
+  0% {
+    transform: translate3d(0, var(--float-column-from), 0)
+      scale(var(--float-column-scale));
+  }
+
+  36% {
+    transform: translate3d(0, var(--float-column-mid), 0)
+      scale(var(--float-column-scale));
+  }
+
+  100% {
+    transform: translate3d(0, var(--float-column-to), 0)
+      scale(var(--float-column-scale));
+  }
+}
+
+@keyframes elsewhere-float-texture {
+  0% {
+    opacity: calc(var(--float-texture-opacity) * 0.28);
+    transform: scale(1.02) translate3d(-1%, 1%, 0);
+  }
+
+  19% {
+    opacity: var(--float-texture-opacity);
+  }
+
+  27% {
+    opacity: calc(var(--float-texture-opacity) * 0.42);
+  }
+
+  51% {
+    opacity: var(--float-texture-opacity);
+  }
+
+  58% {
+    opacity: calc(var(--float-texture-opacity) * 0.64);
+  }
+
+  79% {
+    opacity: calc(var(--float-texture-opacity) * 1.18);
+  }
+
+  100% {
+    opacity: calc(var(--float-texture-opacity) * 0.5);
+    transform: scale(1.1) translate3d(2%, -2%, 0);
+  }
+}
+
+@keyframes elsewhere-float-organic {
+  0% {
+    opacity: calc(var(--float-organic-opacity) * 0.24);
+    transform: scale(1.02) translate3d(-2%, 2%, 0);
+  }
+
+  18% {
+    opacity: var(--float-organic-opacity);
+  }
+
+  24% {
+    opacity: calc(var(--float-organic-opacity) * 0.38);
+  }
+
+  47% {
+    opacity: calc(var(--float-organic-opacity) * 0.82);
+  }
+
+  63% {
+    opacity: calc(var(--float-organic-opacity) * 0.32);
+  }
+
+  69% {
+    opacity: var(--float-organic-opacity);
+  }
+
+  100% {
+    opacity: calc(var(--float-organic-opacity) * 0.54);
+    transform: scale(1.12) translate3d(3%, -3%, 0);
+  }
+}
+
+@keyframes elsewhere-float-image-fragment {
+  0% {
+    opacity: calc(var(--float-image-opacity) * 0.42);
+    transform: scale(1.02) translate3d(-2%, 1%, 0);
+  }
+
+  48% {
+    opacity: var(--float-image-opacity);
+  }
+
+  100% {
+    opacity: calc(var(--float-image-opacity) * 0.58);
+    transform: scale(1.12) translate3d(3%, -2%, 0);
+  }
+}
+
+.elsewhere-archive-image {
+  filter: grayscale(54%) saturate(72%) contrast(94%);
+}
+
+.group:hover .elsewhere-archive-image,
+.elsewhere-archive-image:hover {
+  filter: grayscale(10%) saturate(94%) contrast(100%) !important;
+}
+
+.elsewhere-archive-texture {
+  pointer-events: none;
+  background-image: url("/textures/fingerprint-smudge.png"),
+    url("/textures/dust-scratches.png"),
+    url("/textures/photocopy-noise.png");
+  background-position: center, center, center;
+  background-size: cover, cover, 150%;
+  mix-blend-mode: screen;
+  opacity: 0.1;
+  transition: opacity 700ms ease;
+}
+
+.group:hover .elsewhere-archive-texture,
+button:hover > .elsewhere-archive-texture {
+  opacity: 0.08;
+}
+
+.elsewhere-float-mosaic {
+  z-index: 10;
+  grid-auto-flow: dense;
+  grid-auto-rows: minmax(0, 1fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+}
+
+.elsewhere-float-drift-image {
+  animation: elsewhere-float-column var(--float-column-duration) ease-in-out
+    var(--float-column-delay) infinite alternate;
+}
+
+.elsewhere-float-tile-frame {
+  grid-column: span var(--float-column-span);
+  grid-row: span var(--float-row-span);
+  min-height: 0;
+  transform: rotate(var(--float-edge-rotation, 0deg));
+}
+
+.elsewhere-float-edge {
+  pointer-events: none;
+  background-image: url("/textures/torn-paper-edge.png");
+  background-position: center;
+  background-size: 125% 118%;
+  mix-blend-mode: screen;
+  opacity: 0.08;
+}
+
+.elsewhere-float-texture,
+.elsewhere-float-texture-surface {
+  pointer-events: none;
+  background-position: center;
+  background-size: cover;
+  mix-blend-mode: screen;
+}
+
+.elsewhere-float-texture {
+  filter: brightness(62%) contrast(245%);
+  animation: elsewhere-float-texture var(--float-texture-duration) ease-in-out
+    var(--float-texture-delay) infinite alternate;
+}
+
+.elsewhere-float-texture-mosaic {
+  z-index: 20;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+  pointer-events: none;
+}
+
+.elsewhere-float-texture-fragment {
+  position: relative;
+  overflow: visible;
+  pointer-events: none;
+  transition:
+    opacity 950ms ease-in-out,
+    grid-column 900ms ease-in-out,
+    grid-row 900ms ease-in-out;
+}
+
+.elsewhere-float-texture-surface {
+  inset: -16%;
+  background-position: var(--float-organic-x) var(--float-organic-y);
+  background-size: var(--float-organic-size);
+  background-repeat: no-repeat;
+  filter: brightness(46%) contrast(320%);
+  -webkit-mask-image: radial-gradient(
+    ellipse at center,
+    #000 28%,
+    rgba(0, 0, 0, 0.9) 48%,
+    rgba(0, 0, 0, 0.38) 70%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse at center,
+    #000 28%,
+    rgba(0, 0, 0, 0.9) 48%,
+    rgba(0, 0, 0, 0.38) 70%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  animation: elsewhere-float-organic var(--float-organic-duration) ease-in-out
+    var(--float-organic-delay) infinite alternate;
+}
+
+.elsewhere-float-image-mosaic {
+  z-index: 15;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+  pointer-events: none;
+}
+
+.elsewhere-float-image-fragment {
+  position: relative;
+  overflow: visible;
+  pointer-events: none;
+  transition:
+    opacity 1450ms ease-in-out,
+    grid-column 1200ms ease-in-out,
+    grid-row 1200ms ease-in-out;
+}
+
+.elsewhere-float-image-surface {
+  inset: -14%;
+  background-position: var(--float-image-x) var(--float-image-y);
+  background-size: var(--float-image-size);
+  background-repeat: no-repeat;
+  filter: brightness(70%) contrast(112%) saturate(82%);
+  -webkit-mask-image: radial-gradient(
+    ellipse at center,
+    #000 26%,
+    rgba(0, 0, 0, 0.82) 49%,
+    rgba(0, 0, 0, 0.3) 72%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse at center,
+    #000 26%,
+    rgba(0, 0, 0, 0.82) 49%,
+    rgba(0, 0, 0, 0.3) 72%,
+    transparent 100%
+  );
+  mix-blend-mode: screen;
+  animation: elsewhere-float-image-fragment var(--float-image-duration) ease-in-out
+    var(--float-image-delay) infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .elsewhere-float-drift-image,
+  .elsewhere-float-texture,
+  .elsewhere-float-texture-surface,
+  .elsewhere-float-image-surface {
+    animation-duration: 1ms;
+  }
+}

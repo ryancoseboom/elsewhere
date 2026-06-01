@@ -41,7 +41,9 @@ export default async function MotifPage({
   }
 
   const artifacts = (data || []).filter((artifact) =>
-    (artifact.motifs || []).some((motif) => normalize(motif) === slug)
+    ((artifact.motifs || []) as string[]).some(
+  (motif: string) => normalize(motif) === slug
+)
   ) as Artifact[];
 
   if (artifacts.length === 0) {

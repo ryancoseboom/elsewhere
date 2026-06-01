@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import crypto from "crypto";
+import ArtifactMediaFields from "@/components/ArtifactMediaFields";
 
 type Artifact = {
   id: string;
@@ -9,6 +10,12 @@ type Artifact = {
   title: string;
   parent_slug: string | null;
   kind: string | null;
+  artifact_type: string | null;
+  parent_id: string | null;
+  band_id: string | null;
+  album_id: string | null;
+  song_id: string | null;
+  sort_order: number | null;
   description: string | null;
   fragment: string | null;
   atmosphere: string[] | null;
@@ -24,7 +31,33 @@ type Artifact = {
   album: string | null;
   year: string | null;
   era: string | null;
+  is_public: boolean | null;
 };
+
+type ArtifactOption = {
+  id: string;
+  title: string;
+  slug: string;
+  artifact_type: string | null;
+  kind: string | null;
+};
+
+const ARTIFACT_TYPES = [
+  "Band",
+  "Album",
+  "Song",
+  "Artwork",
+  "Video",
+  "Demo",
+  "Design",
+  "Photo",
+  "Document",
+  "Object",
+  "Place",
+  "Character",
+  "Text",
+  "Other",
+];
 
 function slugify(value: string) {
   return value
@@ -41,6 +74,19 @@ function splitList(value: FormDataEntryValue | null) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function cleanId(value: FormDataEntryValue | null) {
+  const stringValue = String(value || "").trim();
+  return stringValue.length > 0 ? stringValue : null;
+}
+
+function getSelectedArtifactSlug(
+  artifacts: ArtifactOption[],
+  id: string | null
+) {
+  if (!id) return "";
+  return artifacts.find((artifact) => artifact.id === id)?.slug || "";
 }
 
 function getFileExtension(fileName: string) {
@@ -92,6 +138,20 @@ async function updateArtifact(formData: FormData) {
     throw new Error("Missing required fields.");
   }
 
+  const artifact_type = String(formData.get("artifact_type") || "Other").trim();
+
+  const parent_id = cleanId(formData.get("parent_id"));
+  const band_id = cleanId(formData.get("band_id"));
+  const album_id = cleanId(formData.get("album_id"));
+  const song_id = cleanId(formData.get("song_id"));
+  const sort_order = Number(formData.get("sort_order") || 0);
+
+  const { data: existingArtifacts } = await supabase
+    .from("artifacts")
+    .select("id, slug, title, artifact_type, kind");
+
+  const artifacts = (existingArtifacts || []) as ArtifactOption[];
+
   const existingImageUrl = String(formData.get("existing_image_url") || "");
   const existingAudioUrl = String(formData.get("existing_audio_url") || "");
   const existingVideoUrl = String(formData.get("existing_video_url") || "");
@@ -102,29 +162,21 @@ async function updateArtifact(formData: FormData) {
 
   const image_url =
     imageFile instanceof File && imageFile.size > 0
-      ? await uploadArtifactFile({
-          file: imageFile,
-          folder: "images",
-          slug,
-        })
+      ? await uploadArtifactFile({ file: imageFile, folder: "images", slug })
       : existingImageUrl;
 
   const audio_url =
-    audioFile instanceof File && audioFile.size > 0
-      ? await uploadArtifactFile({
-          file: audioFile,
-          folder: "audio",
-          slug,
-        })
+    artifact_type === "Album"
+      ? ""
+      : audioFile instanceof File && audioFile.size > 0
+      ? await uploadArtifactFile({ file: audioFile, folder: "audio", slug })
       : existingAudioUrl;
 
   const video_url =
-    videoFile instanceof File && videoFile.size > 0
-      ? await uploadArtifactFile({
-          file: videoFile,
-          folder: "video",
-          slug,
-        })
+    artifact_type === "Album"
+      ? ""
+      : videoFile instanceof File && videoFile.size > 0
+      ? await uploadArtifactFile({ file: videoFile, folder: "video", slug })
       : existingVideoUrl;
 
   const { error } = await supabase
@@ -132,14 +184,27 @@ async function updateArtifact(formData: FormData) {
     .update({
       title,
       slug,
-      parent_slug: String(formData.get("parent_slug") || "").trim(),
-      kind: String(formData.get("kind") || "").trim(),
+
+      artifact_type,
+      kind: artifact_type,
+
+      parent_id,
+      band_id,
+      album_id,
+      song_id,
+      sort_order,
+
+      parent_slug:
+        String(formData.get("parent_slug") || "").trim() ||
+        getSelectedArtifactSlug(artifacts, parent_id),
+
       description: String(formData.get("description") || "").trim(),
       fragment: String(formData.get("fragment") || "").trim(),
       atmosphere: splitList(formData.get("atmosphere")),
       motifs: splitList(formData.get("motifs")),
       rooms: splitList(formData.get("rooms")),
       nearby: splitList(formData.get("nearby")),
+
       image_url,
       audio_url,
       video_url,
@@ -149,6 +214,7 @@ async function updateArtifact(formData: FormData) {
       album: String(formData.get("album") || "").trim(),
       year: String(formData.get("year") || "").trim(),
       era: String(formData.get("era") || "").trim(),
+      is_public: formData.get("is_public") === "yes",
     })
     .eq("id", id);
 
@@ -172,6 +238,56 @@ async function deleteArtifact(formData: FormData) {
   redirect("/backroom");
 }
 
+function ArtifactSelect({
+  name,
+  label,
+  artifacts,
+  currentValue,
+  currentArtifactId,
+  filterType,
+  help,
+}: {
+  name: string;
+  label: string;
+  artifacts: ArtifactOption[];
+  currentValue?: string | null;
+  currentArtifactId?: string;
+  filterType?: string;
+  help?: string;
+}) {
+  const options = filterType
+    ? artifacts.filter(
+        (artifact) =>
+          artifact.id !== currentArtifactId &&
+          (artifact.artifact_type === filterType || artifact.kind === filterType)
+      )
+    : artifacts.filter((artifact) => artifact.id !== currentArtifactId);
+
+  return (
+    <div>
+      <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+        {label}
+      </label>
+
+      <select
+        name={name}
+        defaultValue={currentValue || ""}
+        className="w-full border border-stone-800 bg-neutral-950 px-4 py-3 text-stone-200 outline-none focus:border-stone-400"
+      >
+        <option value="">None</option>
+
+        {options.map((artifact) => (
+          <option key={artifact.id} value={artifact.id}>
+            {artifact.title} / {artifact.slug}
+          </option>
+        ))}
+      </select>
+
+      {help && <p className="mt-2 text-xs text-stone-600">{help}</p>}
+    </div>
+  );
+}
+
 export default async function EditArtifactPage({
   params,
 }: {
@@ -183,7 +299,7 @@ export default async function EditArtifactPage({
   const { data: artifact, error } = await supabase
     .from("artifacts")
     .select(
-      "id, slug, title, parent_slug, kind, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, private_notes, lyrics, album, year, era"
+      "id, slug, title, parent_slug, kind, artifact_type, parent_id, band_id, album_id, song_id, sort_order, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, private_notes, lyrics, album, year, era, is_public"
     )
     .eq("slug", slug)
     .single();
@@ -194,8 +310,15 @@ export default async function EditArtifactPage({
 
   const item = artifact as Artifact;
 
+  const { data: artifactOptionsData } = await supabase
+    .from("artifacts")
+    .select("id, title, slug, artifact_type, kind")
+    .order("title", { ascending: true });
+
+  const artifacts = (artifactOptionsData || []) as ArtifactOption[];
+
   return (
-    <main className="min-h-screen bg-neutral-950 text-stone-200 px-6 py-16">
+    <main className="min-h-screen bg-neutral-950 px-6 py-16 text-stone-200">
       <div className="mx-auto max-w-3xl">
         <Link
           href="/backroom"
@@ -204,16 +327,16 @@ export default async function EditArtifactPage({
           ← Backroom
         </Link>
 
-        <header className="mt-12 mb-12">
+        <header className="mb-12 mt-12">
           <p className="text-xs uppercase tracking-[0.4em] text-stone-500">
             Artifact Workshop
           </p>
 
-          <h1 className="mt-4 text-4xl md:text-6xl font-serif text-stone-100">
+          <h1 className="mt-4 font-serif text-4xl text-stone-100 md:text-6xl">
             Adjust the signal.
           </h1>
 
-          <p className="mt-6 max-w-xl text-stone-400 leading-relaxed">
+          <p className="mt-6 max-w-xl leading-relaxed text-stone-400">
             Some things arrive nearly whole. Others need their edges softened,
             renamed, hidden, or brought closer to something else.
           </p>
@@ -221,197 +344,275 @@ export default async function EditArtifactPage({
 
         <form action={updateArtifact} className="space-y-10">
           <input type="hidden" name="id" value={item.id} />
-          <input type="hidden" name="existing_image_url" value={item.image_url || ""} />
-          <input type="hidden" name="existing_audio_url" value={item.audio_url || ""} />
-          <input type="hidden" name="existing_video_url" value={item.video_url || ""} />
+          <input
+            type="hidden"
+            name="existing_image_url"
+            value={item.image_url || ""}
+          />
+          <input
+            type="hidden"
+            name="existing_audio_url"
+            value={item.audio_url || ""}
+          />
+          <input
+            type="hidden"
+            name="existing_video_url"
+            value={item.video_url || ""}
+          />
 
-          <section className="border border-stone-800 bg-stone-950/60 p-6 space-y-6">
+          <section className="space-y-6 border border-stone-800 bg-stone-950/60 p-6">
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Title
               </label>
               <input
                 name="title"
                 required
                 defaultValue={item.title}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-xl text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-xl text-stone-100 outline-none focus:border-stone-300"
               />
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Slug
               </label>
               <input
                 name="slug"
                 required
                 defaultValue={item.slug}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+              />
+            </div>
+
+            <ArtifactMediaFields
+              artifactTypes={ARTIFACT_TYPES}
+              defaultArtifactType={item.artifact_type || item.kind || "Other"}
+              existingAudioUrl={item.audio_url}
+              existingVideoUrl={item.video_url}
+              mode="replace"
+            />
+          </section>
+
+          <label className="flex items-center gap-3 border border-stone-800 bg-stone-950/60 p-6 text-sm text-stone-300">
+            <input
+              type="checkbox"
+              name="is_public"
+              value="yes"
+              defaultChecked={Boolean(item.is_public)}
+            />
+            Publish this artifact
+          </label>
+
+          <section className="space-y-6 border border-stone-800 bg-stone-950/60 p-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.35em] text-stone-500">
+                Hierarchy
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-stone-600">
+                Bands contain albums. Albums contain songs. Songs and albums can
+                also have child artifacts like artwork, videos, demos, designs,
+                and documents.
+              </p>
+            </div>
+
+            <ArtifactSelect
+              name="band_id"
+              label="Band"
+              artifacts={artifacts}
+              currentValue={item.band_id}
+              currentArtifactId={item.id}
+              filterType="Band"
+              help="Use for albums, songs, and related artifacts."
+            />
+
+            <ArtifactSelect
+              name="album_id"
+              label="Album"
+              artifacts={artifacts}
+              currentValue={item.album_id}
+              currentArtifactId={item.id}
+              filterType="Album"
+              help="Use for songs and album-related artifacts."
+            />
+
+            <ArtifactSelect
+              name="song_id"
+              label="Song"
+              artifacts={artifacts}
+              currentValue={item.song_id}
+              currentArtifactId={item.id}
+              filterType="Song"
+              help="Use for artwork, videos, demos, or documents tied to a specific song."
+            />
+
+            <ArtifactSelect
+              name="parent_id"
+              label="Parent Artifact"
+              artifacts={artifacts}
+              currentValue={item.parent_id}
+              currentArtifactId={item.id}
+              help="The direct parent. For an album this is usually the band. For a song this is usually the album."
+            />
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+                Sort Order
+              </label>
+              <input
+                name="sort_order"
+                type="number"
+                defaultValue={item.sort_order || 0}
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
               />
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
-                What is it?
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+                Legacy Belongs To Slug
               </label>
-              <select
-                name="kind"
-                defaultValue={item.kind || "Other"}
-                className="w-full bg-neutral-950 border border-stone-800 px-4 py-3 text-stone-200 outline-none focus:border-stone-400"
-              >
-                <option>Song</option>
-                <option>Photograph</option>
-                <option>Design</option>
-                <option>Object</option>
-                <option>Memory</option>
-                <option>Video</option>
-                <option>Fragment</option>
-                <option>Other</option>
-              </select>
+              <input
+                name="parent_slug"
+                defaultValue={item.parent_slug || ""}
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                placeholder="coco"
+              />
+              <p className="mt-2 text-xs text-stone-600">
+                Optional fallback. The new Parent Artifact dropdown is preferred.
+              </p>
             </div>
           </section>
 
-          <section className="border border-stone-800 bg-stone-950/60 p-6 space-y-6">
+          <section className="space-y-6 border border-stone-800 bg-stone-950/60 p-6">
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
-                Album
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+                Album Name
               </label>
               <input
                 name="album"
                 defaultValue={item.album || ""}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
                 placeholder="Coco"
               />
+              <p className="mt-2 text-xs text-stone-600">
+                Legacy display field. We’ll eventually replace this with the
+                Album dropdown above.
+              </p>
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Year
               </label>
               <input
                 name="year"
                 defaultValue={item.year || ""}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
                 placeholder="2026"
               />
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Era
               </label>
               <input
                 name="era"
                 defaultValue={item.era || ""}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
                 placeholder="Coco / The Visitor"
               />
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Lyrics
               </label>
               <textarea
                 name="lyrics"
                 rows={12}
                 defaultValue={item.lyrics || ""}
-                className="w-full bg-transparent border border-stone-800 px-4 py-3 text-stone-300 outline-none focus:border-stone-400"
+                className="w-full border border-stone-800 bg-transparent px-4 py-3 text-stone-300 outline-none focus:border-stone-400"
                 placeholder="Words that survived the room."
               />
             </div>
           </section>
 
-          <section className="border border-stone-800 bg-stone-950/60 p-6 space-y-6">
+          <section className="space-y-6 border border-stone-800 bg-stone-950/60 p-6">
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Fragment
               </label>
               <textarea
                 name="fragment"
                 rows={3}
                 defaultValue={item.fragment || ""}
-                className="w-full bg-transparent border border-stone-800 px-4 py-3 text-stone-100 outline-none focus:border-stone-400"
+                className="w-full border border-stone-800 bg-transparent px-4 py-3 text-stone-100 outline-none focus:border-stone-400"
               />
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Description
               </label>
               <textarea
                 name="description"
                 rows={5}
                 defaultValue={item.description || ""}
-                className="w-full bg-transparent border border-stone-800 px-4 py-3 text-stone-300 outline-none focus:border-stone-400"
+                className="w-full border border-stone-800 bg-transparent px-4 py-3 text-stone-300 outline-none focus:border-stone-400"
               />
             </div>
           </section>
 
-          <section className="border border-stone-800 bg-stone-950/60 p-6 space-y-6">
+          <section className="space-y-6 border border-stone-800 bg-stone-950/60 p-6">
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Atmosphere
               </label>
               <input
                 name="atmosphere"
                 defaultValue={(item.atmosphere || []).join(", ")}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
               />
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Motifs
               </label>
               <input
                 name="motifs"
                 defaultValue={(item.motifs || []).join(", ")}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
               />
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Rooms
               </label>
               <input
                 name="rooms"
                 defaultValue={(item.rooms || []).join(", ")}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
               />
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Nearby Things
               </label>
               <input
                 name="nearby"
                 defaultValue={(item.nearby || []).join(", ")}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
               />
-            </div>
-
-            <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
-                Belongs To
-              </label>
-              <input
-                name="parent_slug"
-                defaultValue={item.parent_slug || ""}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
-                placeholder="coco"
-              />
-              <p className="mt-2 text-xs text-stone-600">
-                Optional. Enter the slug of the song or artifact this belongs near.
-              </p>
             </div>
           </section>
 
-          <section className="border border-stone-800 bg-stone-950/60 p-6 space-y-6">
+          <section className="space-y-6 border border-stone-800 bg-stone-950/60 p-6">
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 Replace Image File
               </label>
 
@@ -435,52 +636,14 @@ export default async function EditArtifactPage({
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
-                Replace Audio File
-              </label>
-
-              {item.audio_url && (
-                <audio controls src={item.audio_url} className="mb-4 w-full opacity-80" />
-              )}
-
-              <input
-                name="audio_file"
-                type="file"
-                accept="audio/*"
-                className="block w-full text-sm text-stone-400 file:mr-5 file:border file:border-stone-700 file:bg-transparent file:px-5 file:py-3 file:text-xs file:uppercase file:tracking-[0.2em] file:text-stone-300 hover:file:border-stone-400"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
-                Replace Video File
-              </label>
-
-              {item.video_url && (
-                <video
-                  controls
-                  src={item.video_url}
-                  className="mb-4 w-full border border-stone-800 opacity-90"
-                />
-              )}
-
-              <input
-                name="video_file"
-                type="file"
-                accept="video/*"
-                className="block w-full text-sm text-stone-400 file:mr-5 file:border file:border-stone-700 file:bg-transparent file:px-5 file:py-3 file:text-xs file:uppercase file:tracking-[0.2em] file:text-stone-300 hover:file:border-stone-400"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
                 YouTube Link
               </label>
 
               <input
                 name="youtube_url"
                 defaultValue={item.youtube_url || ""}
-                className="w-full bg-transparent border-b border-stone-700 px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
                 placeholder="https://www.youtube.com/watch?v=..."
               />
 
@@ -493,40 +656,43 @@ export default async function EditArtifactPage({
           </section>
 
           <section className="border border-stone-800 bg-stone-950/60 p-6">
-            <label className="block text-xs uppercase tracking-[0.25em] text-stone-500 mb-2">
+            <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
               Private Notes
             </label>
             <textarea
               name="private_notes"
               rows={5}
               defaultValue={item.private_notes || ""}
-              className="w-full bg-transparent border border-stone-800 px-4 py-3 text-stone-300 outline-none focus:border-stone-400"
+              className="w-full border border-stone-800 bg-transparent px-4 py-3 text-stone-300 outline-none focus:border-stone-400"
             />
           </section>
 
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="submit"
-              className="border border-stone-600 px-8 py-4 text-sm uppercase tracking-[0.25em] text-stone-200 hover:bg-stone-200 hover:text-neutral-950 transition"
+              className="border border-stone-600 px-8 py-4 text-sm uppercase tracking-[0.25em] text-stone-200 transition hover:bg-stone-200 hover:text-neutral-950"
             >
               Save changes
             </button>
 
             <Link
               href={`/artifact/${item.slug}`}
-              className="border border-stone-800 px-8 py-4 text-sm uppercase tracking-[0.25em] text-stone-500 hover:border-stone-500 hover:text-stone-200 transition"
+              className="border border-stone-800 px-8 py-4 text-sm uppercase tracking-[0.25em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
             >
               Visit
             </Link>
           </div>
         </form>
 
-        <form action={deleteArtifact} className="mt-16 border-t border-stone-800 pt-8">
+        <form
+          action={deleteArtifact}
+          className="mt-16 border-t border-stone-800 pt-8"
+        >
           <input type="hidden" name="id" value={item.id} />
 
           <button
             type="submit"
-            className="text-xs uppercase tracking-[0.25em] text-red-900 hover:text-red-500 transition"
+            className="text-xs uppercase tracking-[0.25em] text-red-900 transition hover:text-red-500"
           >
             Remove this thing from Elsewhere
           </button>

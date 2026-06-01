@@ -12,6 +12,26 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+async function createUniqueSlug(baseSlug: string) {
+  const supabase = await createClient();
+
+  let slug = baseSlug;
+  let counter = 2;
+
+  while (true) {
+    const { data } = await supabase
+      .from("artifacts")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (!data) return slug;
+
+    slug = `${baseSlug}-${counter}`;
+    counter += 1;
+  }
+}
+
 function splitList(value: FormDataEntryValue | null) {
   return String(value || "")
     .split(",")
@@ -67,7 +87,8 @@ async function createArtifact(formData: FormData) {
   const supabase = await createClient();
 
   const title = String(formData.get("title") || "").trim();
-  const slug = slugify(String(formData.get("slug") || title));
+  const baseSlug = slugify(String(formData.get("slug") || title));
+const slug = await createUniqueSlug(baseSlug);
 
   if (!title || !slug) {
     throw new Error("Title and slug are required.");

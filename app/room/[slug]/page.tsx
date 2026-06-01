@@ -59,7 +59,9 @@ export default async function RoomPage({
   }
 
   const artifacts = (data || []).filter((artifact) =>
-    (artifact.rooms || []).some((room) => normalize(room) === slug)
+    ((artifact.rooms || []) as string[]).some(
+  (room: string) => normalize(room) === slug
+)
   ) as Artifact[];
 
   const copy = roomCopy[slug];
