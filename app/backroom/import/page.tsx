@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import LocalAudioImportForm from "./LocalAudioImportForm";
 import LocalLyricsImportForm from "./LocalLyricsImportForm";
 import OnlineLyricsResearchForm from "./OnlineLyricsResearchForm";
+import SpotifyLinksImportForm from "./SpotifyLinksImportForm";
 import BulkSongTagsForm from "./BulkSongTagsForm";
 import BulkArchiveMaterialsForm from "./BulkArchiveMaterialsForm";
 import BulkArtifactTagsForm from "./BulkArtifactTagsForm";
@@ -82,12 +83,22 @@ export default async function ImportPage({
     .select("id, slug, title, album, lyrics, atmosphere, motifs")
     .or("artifact_type.eq.Song,kind.eq.Song")
     .order("title", { ascending: true });
+  const { data: spotifyData } = await supabase
+    .from("artifacts")
+    .select("id, spotify_url");
+  const spotifyUrls = new Map(
+    (spotifyData || []).map((song) => [
+      song.id as string,
+      song.spotify_url as string | null,
+    ])
+  );
   const songs = (songData || []).map((song) => ({
     id: song.id as string,
     slug: song.slug as string,
     title: song.title as string,
     album: song.album as string | null,
     hasLyrics: Boolean(song.lyrics),
+    spotifyUrl: spotifyUrls.get(song.id as string) || null,
     atmosphere: (song.atmosphere || []) as string[],
     motifs: (song.motifs || []) as string[],
   }));
@@ -704,6 +715,18 @@ export default async function ImportPage({
             before anything is uploaded.
           </p>
           <LocalAudioImportForm />
+        </section>
+
+        <section className="mt-8 border border-stone-800 bg-stone-950/60 p-6">
+          <p className="text-xs uppercase tracking-[0.3em] text-stone-500">
+            Spotify links
+          </p>
+          <p className="mt-3 mb-6 max-w-2xl text-sm leading-6 text-stone-500">
+            Paste Spotify track links in any order. Spotify identifies each
+            title, exact matches are selected automatically, and uncertain rows
+            wait for your review.
+          </p>
+          <SpotifyLinksImportForm songs={songs} />
         </section>
 
         <section className="mt-8 border border-stone-800 bg-stone-950/60 p-6">

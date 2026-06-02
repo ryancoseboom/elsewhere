@@ -1,3 +1,9 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 const specimens = [
   { code: "OBJ-017", title: "RED CRYSTAL HEART" },
   { code: "OBJ-011", title: "THE BEAR" },
@@ -11,7 +17,7 @@ function TextureLayers() {
       <div
         className="pointer-events-none absolute inset-0 z-0 opacity-[0.42] mix-blend-screen"
         style={{
-          backgroundImage: "url('/textures/photocopy-noise.png')",
+          backgroundImage: "url('/textures/float/photocopy-noise.jpg')",
           backgroundSize: "420px 420px",
         }}
       />
@@ -19,7 +25,7 @@ function TextureLayers() {
       <div
         className="pointer-events-none absolute inset-0 z-0 opacity-[0.32] mix-blend-screen"
         style={{
-          backgroundImage: "url('/textures/dust-scratches.png')",
+          backgroundImage: "url('/textures/float/dust-scratches.jpg')",
           backgroundSize: "cover",
         }}
       />
@@ -27,7 +33,7 @@ function TextureLayers() {
       <div
         className="pointer-events-none absolute left-[-6%] top-[14%] z-0 h-[38%] w-[42%] rotate-[-4deg] opacity-[0.22] mix-blend-screen"
         style={{
-          backgroundImage: "url('/textures/fingerprint-smudge.png')",
+          backgroundImage: "url('/textures/float/fingerprint-smudge.jpg')",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
         }}
@@ -36,7 +42,7 @@ function TextureLayers() {
       <div
         className="pointer-events-none absolute right-[-4%] top-[52%] z-0 h-[34%] w-[36%] rotate-[9deg] opacity-[0.18] mix-blend-screen"
         style={{
-          backgroundImage: "url('/textures/fingerprint-smudge.png')",
+          backgroundImage: "url('/textures/float/fingerprint-smudge.jpg')",
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
         }}
@@ -61,7 +67,7 @@ function XeroxBlock({
       <div
         className="pointer-events-none absolute -top-3 left-5 z-20 h-7 w-20 rotate-[-7deg] opacity-[0.45] mix-blend-multiply"
         style={{
-          backgroundImage: "url('/textures/masking-tape.png')",
+          backgroundImage: "url('/textures/float/masking-tape.jpg')",
           backgroundSize: "cover",
         }}
       />
@@ -73,7 +79,7 @@ function XeroxBlock({
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.28] mix-blend-multiply"
         style={{
-          backgroundImage: "url('/textures/photocopy-noise.png')",
+          backgroundImage: "url('/textures/float/photocopy-noise.jpg')",
           backgroundSize: "260px 260px",
         }}
       />
@@ -81,7 +87,7 @@ function XeroxBlock({
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-multiply"
         style={{
-          backgroundImage: "url('/textures/dust-scratches.png')",
+          backgroundImage: "url('/textures/float/dust-scratches.jpg')",
           backgroundSize: "cover",
         }}
       />
@@ -192,7 +198,7 @@ export default function Page() {
               <div
                 className="pointer-events-none absolute -inset-[10px] z-20 opacity-[0.35] mix-blend-multiply"
                 style={{
-                  backgroundImage: "url('/textures/torn-paper-edge.png')",
+                  backgroundImage: "url('/textures/float/torn-paper-edge.jpg')",
                   backgroundSize: "100% 100%",
                   backgroundRepeat: "no-repeat",
                 }}
@@ -201,7 +207,7 @@ export default function Page() {
               <div
                 className="pointer-events-none absolute inset-0 z-10 opacity-[0.22] mix-blend-multiply"
                 style={{
-                  backgroundImage: "url('/textures/photocopy-noise.png')",
+                  backgroundImage: "url('/textures/float/photocopy-noise.jpg')",
                   backgroundSize: "380px 380px",
                 }}
               />
@@ -209,7 +215,7 @@ export default function Page() {
               <div
                 className="pointer-events-none absolute inset-0 z-10 opacity-[0.18] mix-blend-multiply"
                 style={{
-                  backgroundImage: "url('/textures/dust-scratches.png')",
+                  backgroundImage: "url('/textures/float/dust-scratches.jpg')",
                   backgroundSize: "cover",
                 }}
               />

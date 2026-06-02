@@ -1,52 +1,110 @@
 import Link from "next/link";
-import { rooms } from "@/data/rooms";
-import { artifacts } from "@/data/artifacts";
+import { connection } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { shuffle } from "@/lib/archive-navigation";
 
-export default function Home() {
-  const driftArtifact = artifacts[0];
+type BackdropArtifact = {
+  image_url: string | null;
+  slug: string;
+  title: string;
+};
+
+const routes = [
+  {
+    href: "/explore",
+    label: "Explore",
+    text: "Read the structure. Follow releases, recordings, and their attached signals.",
+  },
+  {
+    href: "/drift",
+    label: "Drift",
+    text: "Enter without a map. Move through a changing path of related artifacts.",
+  },
+  {
+    href: "/float",
+    label: "Float",
+    text: "Let the archive dissolve into a visual transmission.",
+  },
+];
+
+export default async function Home() {
+  await connection();
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("artifacts")
+    .select("slug, title, image_url")
+    .eq("is_public", true)
+    .not("image_url", "is", null)
+    .limit(120);
+  const backdrop = shuffle(
+    ((data || []) as BackdropArtifact[]).filter((artifact) =>
+      artifact.image_url?.trim()
+    )
+  ).slice(0, 12);
 
   return (
-    <main className="min-h-screen bg-black text-zinc-200 flex items-center justify-center px-8">
-      <div className="max-w-2xl text-center space-y-14">
-        <section className="space-y-6">
-          <p className="text-xs uppercase tracking-[0.5em] text-zinc-700">
-            Halou
-          </p>
+    <main className="relative min-h-screen overflow-hidden bg-[#090807] px-6 py-8 text-stone-200">
+      <div className="absolute inset-0 opacity-55">
+        <div className="grid h-full grid-cols-4 grid-rows-3 gap-1 p-1 md:grid-cols-6">
+          {backdrop.map((artifact, index) => (
+            <div
+              key={`${artifact.slug}-${index}`}
+              className="relative overflow-hidden bg-stone-950"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={artifact.image_url || ""}
+                alt=""
+                className="h-full w-full object-cover opacity-55 transition duration-[4000ms] hover:opacity-80"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(9,8,7,0.22),rgba(9,8,7,0.91)_72%)]" />
+      <div className="absolute inset-0 bg-black/25" />
 
-          <h1 className="text-5xl md:text-7xl tracking-[0.28em]">
-            ELSEWHERE
+      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col justify-between">
+        <p className="text-[10px] uppercase tracking-[0.48em] text-stone-600">
+          Elsewhere / Halou
+        </p>
+
+        <section className="max-w-3xl py-16">
+          <p className="text-[10px] uppercase tracking-[0.58em] text-stone-600">
+            An unstable archive
+          </p>
+          <h1 className="mt-6 font-serif text-7xl leading-none text-stone-100 md:text-[10rem]">
+            Elsewhere
           </h1>
-
-          <p className="text-zinc-500 text-lg">
-            Some rooms are still lit.
+          <p className="mt-7 max-w-xl text-sm leading-7 text-stone-500 md:text-base">
+            Recordings, images, and incomplete transmissions. There is no
+            correct point of entry.
           </p>
+
+          <nav className="mt-14 grid gap-px bg-stone-800/70 md:grid-cols-3">
+            {routes.map((route, index) => (
+              <Link
+                key={route.href}
+                href={route.href}
+                className="group bg-[#0e0d0b]/95 p-6 transition hover:bg-stone-900/95 md:min-h-52"
+              >
+                <p className="text-[9px] uppercase tracking-[0.32em] text-stone-700">
+                  0{index + 1}
+                </p>
+                <p className="mt-8 font-serif text-3xl text-stone-300 transition group-hover:text-white">
+                  {route.label}
+                </p>
+                <p className="mt-4 text-xs leading-6 text-stone-600 transition group-hover:text-stone-400">
+                  {route.text}
+                </p>
+              </Link>
+            ))}
+          </nav>
         </section>
 
-        <nav className="flex flex-col gap-5 pt-6">
-          {rooms.map((room) => (
-            <Link
-              key={room.slug}
-              href={`/room/${room.slug}`}
-              className="text-zinc-400 hover:text-zinc-100 transition"
-            >
-              Enter {room.title}
-            </Link>
-          ))}
-
-          <Link
-            href={`/artifact/${driftArtifact.slug}`}
-            className="pt-8 text-zinc-600 hover:text-zinc-300 transition"
-          >
-            Drift
-          </Link>
-          <Link href="/traces">Traces</Link>
-        </nav>
-        <Link
-  href="/backroom"
-  className="fixed bottom-6 right-6 text-[10px] uppercase tracking-[0.35em] text-stone-700 hover:text-stone-400 transition"
->
-  Backroom
-</Link>
+        <div className="text-[9px] uppercase tracking-[0.3em] text-stone-700">
+          <span>Archive transmission / ongoing</span>
+        </div>
       </div>
     </main>
   );

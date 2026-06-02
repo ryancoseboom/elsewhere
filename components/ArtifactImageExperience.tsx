@@ -1,7 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+} from "react";
 import FloatRecorder, { type FloatRecording } from "./FloatRecorder";
+import { spotifyUrl as normalizeSpotifyUrl } from "@/lib/spotify";
 
 type ExperienceImage = {
   src: string;
@@ -41,20 +50,21 @@ const recordingDimensions: RecordingDimensions[] = [
   { height: 1920, label: "Portrait / 1080 x 1920", width: 1080 },
 ];
 const floatTextures = [
-  "/textures/black-scratches.png",
-  "/textures/blur-grunge.png",
-  "/textures/dust-scratches.png",
-  "/textures/fingerprint-smudge.png",
-  "/textures/flare-noise.png",
-  "/textures/folded-paper.png",
-  "/textures/halftone-noise.png",
-  "/textures/photocopy-noise.png",
-  "/textures/masking-tape.png",
-  "/textures/rip-noise.png",
-  "/textures/scrape.png",
-  "/textures/text-noise.png",
-  "/textures/vhs-noise.png",
+  "/textures/float/black-scratches.jpg",
+  "/textures/float/blur-grunge.jpg",
+  "/textures/float/dust-scratches.jpg",
+  "/textures/float/fingerprint-smudge.jpg",
+  "/textures/float/flare-noise.jpg",
+  "/textures/float/folded-paper.jpg",
+  "/textures/float/halftone-noise.jpg",
+  "/textures/float/photocopy-noise.jpg",
+  "/textures/float/masking-tape.jpg",
+  "/textures/float/rip-noise.jpg",
+  "/textures/float/scrape.jpg",
+  "/textures/float/text-noise.jpg",
+  "/textures/float/vhs-noise.jpg",
 ];
+const floatTextureCount = 7;
 
 function seededUnit(seed: number) {
   const value = Math.sin(seed * 9187.17) * 10000;
@@ -74,6 +84,25 @@ function floatTileSpan(seed: number, maximum: number) {
   if (size < 0.9) return 4;
 
   return Math.floor(seededRange(seed + 1, 5, maximum + 1));
+}
+
+function selectFloatTextures(seed: number) {
+  return [...floatTextures]
+    .sort((left, right) => {
+      const leftScore = seededUnit(seed + floatTextures.indexOf(left) * 17);
+      const rightScore = seededUnit(seed + floatTextures.indexOf(right) * 17);
+
+      return leftScore - rightScore;
+    })
+    .slice(0, floatTextureCount);
+}
+
+function clusteredSwapDelay(seed: number, minimum: number, maximum: number) {
+  const clusters = [0.18, 0.43, 0.72, 0.94];
+  const cluster = clusters[Math.floor(seededUnit(seed) * clusters.length)];
+  const jitter = seededRange(seed + 1, -0.07, 0.07);
+
+  return minimum + Math.max(0, Math.min(1, cluster + jitter)) * (maximum - minimum);
 }
 
 function organicClipPath(seed: number) {
@@ -143,18 +172,19 @@ function FloatTile({
   onOpen,
   seed,
   style,
+  textures,
 }: {
   images: ExperienceImage[];
   initialImageIndex: number;
   onOpen: (image: ExperienceImage) => void;
   seed: number;
   style: CSSProperties;
+  textures: string[];
 }) {
   const [imageIndex, setImageIndex] = useState(initialImageIndex);
   const [visible, setVisible] = useState(true);
   const image = images[imageIndex];
-  const texture =
-    floatTextures[Math.floor(seededUnit(seed + imageIndex) * floatTextures.length)];
+  const texture = textures[Math.floor(seededUnit(seed + imageIndex) * textures.length)];
 
   useEffect(() => {
     if (images.length < 2) return;
@@ -164,7 +194,7 @@ function FloatTile({
     let revealTimer: ReturnType<typeof setTimeout>;
 
     function scheduleSwap() {
-      const visibleDuration = seededRange(seed + Date.now(), 9200, 15800);
+      const visibleDuration = clusteredSwapDelay(seed + Date.now(), 7600, 17400);
       fadeTimer = setTimeout(() => {
         setVisible(false);
         swapTimer = setTimeout(() => {
@@ -200,7 +230,8 @@ function FloatTile({
         "--float-edge-rotation": `${seededRange(seed + 25, -0.75, 0.75).toFixed(2)}deg`,
         "--float-texture-delay": `${-seededRange(seed + 26, 0, 8).toFixed(2)}s`,
         "--float-texture-duration": `${seededRange(seed + 27, 2.8, 7).toFixed(2)}s`,
-        "--float-texture-opacity": seededRange(seed + 28, 0.08, 0.22).toFixed(3),
+        "--float-edge-opacity": seededRange(seed + 31, 0, 0.15).toFixed(3),
+        "--float-texture-opacity": seededRange(seed + 28, 0.05, 0.2).toFixed(3),
       } as CSSProperties}
       onClick={() => onOpen(image)}
     >
@@ -231,14 +262,16 @@ function FloatTile({
 function FloatTextureFragment({
   initialTextureIndex,
   seed,
+  textures,
 }: {
   initialTextureIndex: number;
   seed: number;
+  textures: string[];
 }) {
   const [textureIndex, setTextureIndex] = useState(initialTextureIndex);
   const [visible, setVisible] = useState(true);
   const [layoutSeed, setLayoutSeed] = useState(seed);
-  const texture = floatTextures[textureIndex];
+  const texture = textures[textureIndex];
 
   useEffect(() => {
     let fadeTimer: ReturnType<typeof setTimeout>;
@@ -250,8 +283,8 @@ function FloatTextureFragment({
         setVisible(false);
         swapTimer = setTimeout(() => {
           setTextureIndex((currentIndex) => {
-            const offset = 1 + Math.floor(Math.random() * (floatTextures.length - 1));
-            return (currentIndex + offset) % floatTextures.length;
+            const offset = 1 + Math.floor(Math.random() * (textures.length - 1));
+            return (currentIndex + offset) % textures.length;
           });
           setLayoutSeed(Math.floor(Math.random() * 1_000_000));
           revealTimer = setTimeout(() => {
@@ -259,7 +292,7 @@ function FloatTextureFragment({
             scheduleSwap();
           }, seededRange(seed + Date.now() + 1, 300, 750));
         }, 950);
-      }, seededRange(seed + Date.now(), 2600, 6800));
+      }, clusteredSwapDelay(seed + Date.now(), 2300, 7600));
     }
 
     scheduleSwap();
@@ -269,7 +302,7 @@ function FloatTextureFragment({
       clearTimeout(swapTimer);
       clearTimeout(revealTimer);
     };
-  }, [seed]);
+  }, [seed, textures.length]);
 
   return (
     <div
@@ -292,6 +325,68 @@ function FloatTextureFragment({
           "--float-organic-y": `${seededRange(layoutSeed + 9, 0, 100).toFixed(1)}%`,
           "--float-organic-size": `${seededRange(layoutSeed + 10, 85, 170).toFixed(1)}%`,
         } as CSSProperties}
+      />
+    </div>
+  );
+}
+
+function FloatHeroInterruption({
+  images,
+  seed,
+}: {
+  images: ExperienceImage[];
+  seed: number;
+}) {
+  const [imageIndex, setImageIndex] = useState(
+    Math.floor(seededUnit(seed + 1) * images.length)
+  );
+  const [visible, setVisible] = useState(false);
+  const [layoutSeed, setLayoutSeed] = useState(seed);
+
+  useEffect(() => {
+    let revealTimer: ReturnType<typeof setTimeout>;
+    let hideTimer: ReturnType<typeof setTimeout>;
+    let nextTimer: ReturnType<typeof setTimeout>;
+
+    function schedule() {
+      revealTimer = setTimeout(() => {
+        setLayoutSeed(Math.floor(Math.random() * 1_000_000));
+        setImageIndex(Math.floor(Math.random() * images.length));
+        setVisible(true);
+        hideTimer = setTimeout(() => {
+          setVisible(false);
+          nextTimer = setTimeout(schedule, 2200);
+        }, seededRange(seed + Date.now(), 3600, 6200));
+      }, clusteredSwapDelay(seed + Date.now(), 12000, 25000));
+    }
+
+    schedule();
+
+    return () => {
+      clearTimeout(revealTimer);
+      clearTimeout(hideTimer);
+      clearTimeout(nextTimer);
+    };
+  }, [images.length, seed]);
+
+  return (
+    <div
+      aria-hidden
+      className="elsewhere-float-hero-interruption absolute"
+      style={{
+        height: `${seededRange(layoutSeed + 1, 46, 76).toFixed(1)}%`,
+        left: `${seededRange(layoutSeed + 2, -12, 52).toFixed(1)}%`,
+        opacity: visible ? seededRange(layoutSeed + 3, 0.3, 0.64) : 0,
+        top: `${seededRange(layoutSeed + 4, -8, 48).toFixed(1)}%`,
+        transform: `rotate(${seededRange(layoutSeed + 5, -2.8, 2.8).toFixed(2)}deg) scale(${visible ? "1.04" : "0.96"})`,
+        width: `${seededRange(layoutSeed + 6, 42, 82).toFixed(1)}%`,
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={images[imageIndex].src}
+        alt=""
+        className="h-full w-full object-cover"
       />
     </div>
   );
@@ -371,14 +466,22 @@ function FloatImageFragment({
 }
 
 export default function ArtifactImageExperience({
+  autoLaunch = false,
   images,
+  returnHref,
+  showTrigger = true,
+  spotifyUrl,
 }: {
+  autoLaunch?: boolean;
   images: ExperienceImage[];
+  returnHref?: string;
+  showTrigger?: boolean;
+  spotifyUrl?: string | null;
 }) {
   const [lightboxImage, setLightboxImage] = useState<ExperienceImage | null>(
     null
   );
-  const [floating, setFloating] = useState(false);
+  const [floating, setFloating] = useState(autoLaunch && images.length > 0);
   const [floatSeed, setFloatSeed] = useState(0);
   const [floatSetup, setFloatSetup] = useState<"record" | "dimensions" | null>(
     null
@@ -389,6 +492,8 @@ export default function ArtifactImageExperience({
     null
   );
   const [recordingName, setRecordingName] = useState("elsewhere-float");
+  const [pageHidden, setPageHidden] = useState(false);
+  const floatRef = useRef<HTMLDivElement>(null);
 
   const launchFloat = useCallback(() => {
     setFloatSeed(Math.floor(Math.random() * 1_000_000));
@@ -482,6 +587,35 @@ export default function ArtifactImageExperience({
     };
   }, [floating, lightboxImage]);
 
+  useEffect(() => {
+    function updateVisibility() {
+      setPageHidden(document.hidden);
+    }
+
+    updateVisibility();
+    document.addEventListener("visibilitychange", updateVisibility);
+
+    return () => document.removeEventListener("visibilitychange", updateVisibility);
+  }, []);
+
+  function moveFloat(event: PointerEvent<HTMLDivElement>) {
+    const x = (event.clientX / window.innerWidth - 0.5) * 2;
+    const y = (event.clientY / window.innerHeight - 0.5) * 2;
+
+    floatRef.current?.style.setProperty("--float-pointer-x", `${(x * 12).toFixed(2)}px`);
+    floatRef.current?.style.setProperty("--float-pointer-y", `${(y * 10).toFixed(2)}px`);
+  }
+
+  function resetFloatPointer() {
+    floatRef.current?.style.setProperty("--float-pointer-x", "0px");
+    floatRef.current?.style.setProperty("--float-pointer-y", "0px");
+  }
+
+  const sessionTextures = useMemo(
+    () => selectFloatTextures(floatSeed),
+    [floatSeed]
+  );
+  const streamUrl = spotifyUrl ? normalizeSpotifyUrl(spotifyUrl) : "";
   const tiles =
     images.length > 0
       ? Array.from({ length: 24 }, (_, index) => {
@@ -489,6 +623,8 @@ export default function ArtifactImageExperience({
             const initialImageIndex = Math.floor(
               seededUnit(seed + 8) * images.length
             );
+
+            const extreme = seededUnit(seed + 32);
 
             return {
               key: `tile-${index}`,
@@ -501,23 +637,32 @@ export default function ArtifactImageExperience({
                 "--float-column-mid": `${seededRange(seed + 4, -4, 12).toFixed(2)}%`,
                 "--float-column-to": `${seededRange(seed + 5, 10, 28).toFixed(2)}%`,
                 "--float-column-opacity": seededRange(seed + 6, 0.28, 0.7).toFixed(2),
-                "--float-column-scale": seededRange(seed + 7, 1.2, 1.5).toFixed(2),
-                "--float-column-span": `${floatTileSpan(seed + 29, 8)}`,
-                "--float-row-span": `${floatTileSpan(seed + 30, 7)}`,
+                "--float-column-scale": seededRange(seed + 7, 1.12, 1.54).toFixed(2),
+                "--float-column-span": `${
+                  extreme < 0.12 ? 1 : extreme > 0.9 ? 7 : floatTileSpan(seed + 29, 8)
+                }`,
+                "--float-overlap-scale": seededRange(seed + 34, 0.98, 1.2).toFixed(3),
+                "--float-overlap-x": `${seededRange(seed + 35, -7, 7).toFixed(2)}%`,
+                "--float-overlap-y": `${seededRange(seed + 36, -7, 7).toFixed(2)}%`,
+                "--float-row-span": `${
+                  extreme < 0.12 ? 6 : extreme > 0.9 ? 1 : floatTileSpan(seed + 30, 7)
+                }`,
+                "--float-tile-play-state":
+                  seededUnit(seed + 37) < 0.12 ? "paused" : "running",
               } as CSSProperties,
             };
-          })
+          }).filter((_, index) => seededUnit(floatSeed + index * 13 + 411) > 0.18)
       : [];
-  const organicLayers = Array.from({ length: 12 }, (_, index) => {
+  const organicLayers = Array.from({ length: 7 }, (_, index) => {
     const seed = floatSeed + index * 31 + 701;
 
     return {
       key: `organic-${floatSeed}-${index}`,
       seed,
-      initialTextureIndex: Math.floor(seededUnit(seed) * floatTextures.length),
+      initialTextureIndex: Math.floor(seededUnit(seed) * sessionTextures.length),
     };
   });
-  const imageLayers = Array.from({ length: 4 }, (_, index) => {
+  const imageLayers = Array.from({ length: 3 }, (_, index) => {
     const seed = floatSeed + index * 47 + 1701;
 
     return {
@@ -528,14 +673,28 @@ export default function ArtifactImageExperience({
   });
   return (
     <>
-      {images.length > 0 && (
-        <button
-          type="button"
-          className="border border-stone-700 px-4 py-2 text-[10px] uppercase tracking-[0.4em] text-stone-400 transition hover:border-stone-400 hover:bg-stone-900 hover:text-stone-100"
-          onClick={() => setFloatSetup("record")}
-        >
-          Float
-        </button>
+      {showTrigger && (images.length > 0 || streamUrl) && (
+        <div className="flex flex-wrap gap-3">
+          {images.length > 0 && (
+            <button
+              type="button"
+              className="border border-stone-700 px-4 py-2 text-[10px] uppercase tracking-[0.4em] text-stone-400 transition hover:border-stone-400 hover:bg-stone-900 hover:text-stone-100"
+              onClick={() => setFloatSetup("record")}
+            >
+              Float
+            </button>
+          )}
+          {streamUrl && (
+            <a
+              href={streamUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="border border-[#315d39] px-4 py-2 text-[10px] uppercase tracking-[0.28em] text-[#82b98b] transition hover:border-[#78b183] hover:bg-[#132218] hover:text-[#b9e1bf]"
+            >
+              Stream on Spotify
+            </a>
+          )}
+        </div>
       )}
 
       {floatSetup && (
@@ -704,7 +863,14 @@ export default function ArtifactImageExperience({
       )}
 
       {floating && (
-        <div className="fixed inset-0 z-[80] overflow-hidden bg-black">
+        <div
+          ref={floatRef}
+          className={`fixed inset-0 z-[80] overflow-hidden bg-black ${
+            pageHidden ? "elsewhere-float-paused" : ""
+          }`}
+          onPointerMove={moveFloat}
+          onPointerLeave={resetFloatPointer}
+        >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(68,64,60,0.18),transparent_65%)]" />
           <div className="elsewhere-float-texture-mosaic absolute inset-0 grid">
             {organicLayers.map((layer) => (
@@ -712,6 +878,7 @@ export default function ArtifactImageExperience({
                 key={layer.key}
                 initialTextureIndex={layer.initialTextureIndex}
                 seed={layer.seed}
+                textures={sessionTextures}
               />
             ))}
           </div>
@@ -725,6 +892,7 @@ export default function ArtifactImageExperience({
               />
             ))}
           </div>
+          <FloatHeroInterruption images={images} seed={floatSeed + 2901} />
           <div className="elsewhere-float-mosaic absolute inset-0 grid gap-2 p-2">
             {tiles.map((tile) => (
               <FloatTile
@@ -734,6 +902,7 @@ export default function ArtifactImageExperience({
                 onOpen={setLightboxImage}
                 seed={tile.seed}
                 style={tile.style}
+                textures={sessionTextures}
               />
             ))}
           </div>
@@ -742,7 +911,7 @@ export default function ArtifactImageExperience({
               height={recording.height}
               images={images}
               seed={floatSeed}
-              textures={floatTextures}
+              textures={sessionTextures}
               width={recording.width}
               onComplete={completeRecording}
               onError={failRecording}
@@ -752,13 +921,22 @@ export default function ArtifactImageExperience({
               <div className="absolute left-5 top-5 z-30 text-[10px] uppercase tracking-[0.42em] text-stone-500">
                 Float / visual transmission
               </div>
-              <button
-                type="button"
-                className="absolute right-5 top-5 z-30 border border-stone-700 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-stone-300 transition hover:border-stone-400 hover:text-white"
-                onClick={() => setFloating(false)}
-              >
-                Return
-              </button>
+              {returnHref ? (
+                <a
+                  href={returnHref}
+                  className="absolute right-5 top-5 z-30 border border-stone-700 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-stone-300 transition hover:border-stone-400 hover:text-white"
+                >
+                  Return
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="absolute right-5 top-5 z-30 border border-stone-700 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-stone-300 transition hover:border-stone-400 hover:text-white"
+                  onClick={() => setFloating(false)}
+                >
+                  Return
+                </button>
+              )}
             </>
           )}
         </div>

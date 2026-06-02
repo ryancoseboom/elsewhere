@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import crypto from "crypto";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
+import { syncAttachedMediaPublication } from "@/lib/artifact-publication";
+import { spotifyUrl } from "@/lib/spotify";
 
 type Artifact = {
   id: string;
@@ -26,6 +28,7 @@ type Artifact = {
   audio_url: string | null;
   video_url: string | null;
   youtube_url: string | null;
+  spotify_url: string | null;
   private_notes: string | null;
   lyrics: string | null;
   album: string | null;
@@ -45,6 +48,7 @@ type ArtifactOption = {
 const ARTIFACT_TYPES = [
   "Band",
   "Album",
+  "Single",
   "Song",
   "Artwork",
   "Video",
@@ -179,6 +183,11 @@ async function updateArtifact(formData: FormData) {
       ? await uploadArtifactFile({ file: videoFile, folder: "video", slug })
       : existingVideoUrl;
 
+  const spotify_url = spotifyUrl(String(formData.get("spotify_url") || ""));
+  const existingSpotifyUrl = String(
+    formData.get("existing_spotify_url") || ""
+  ).trim();
+  const isPublic = formData.get("is_public") === "yes";
   const { error } = await supabase
     .from("artifacts")
     .update({
@@ -214,11 +223,26 @@ async function updateArtifact(formData: FormData) {
       album: String(formData.get("album") || "").trim(),
       year: String(formData.get("year") || "").trim(),
       era: String(formData.get("era") || "").trim(),
-      is_public: formData.get("is_public") === "yes",
+      is_public: isPublic,
     })
     .eq("id", id);
 
   if (error) throw new Error(error.message);
+
+  if (spotify_url !== existingSpotifyUrl) {
+    const { error: spotifyError } = await supabase
+      .from("artifacts")
+      .update({ spotify_url })
+      .eq("id", id);
+
+    if (spotifyError) throw new Error(spotifyError.message);
+  }
+
+  await syncAttachedMediaPublication({
+    artifactId: id,
+    artifactSlug: slug,
+    isPublic,
+  });
 
   redirect("/backroom");
 }
@@ -308,7 +332,15 @@ export default async function EditArtifactPage({
     notFound();
   }
 
-  const item = artifact as Artifact;
+  const { data: spotifyArtifact } = await supabase
+    .from("artifacts")
+    .select("spotify_url")
+    .eq("id", artifact.id)
+    .maybeSingle();
+  const item = {
+    ...artifact,
+    spotify_url: (spotifyArtifact?.spotify_url as string | null) || null,
+  } as Artifact;
 
   const { data: artifactOptionsData } = await supabase
     .from("artifacts")
@@ -410,9 +442,9 @@ export default async function EditArtifactPage({
                 Hierarchy
               </p>
               <p className="mt-2 text-sm leading-relaxed text-stone-600">
-                Bands contain albums. Albums contain songs. Songs and albums can
-                also have child artifacts like artwork, videos, demos, designs,
-                and documents.
+                Bands contain albums and singles. Albums contain songs. Songs,
+                singles, and albums can also have child artifacts like artwork,
+                videos, demos, designs, and documents.
               </p>
             </div>
 
@@ -637,21 +669,39 @@ export default async function EditArtifactPage({
 
             <div>
               <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
-                YouTube Link
+                YouTube or Vimeo Link
               </label>
 
               <input
                 name="youtube_url"
                 defaultValue={item.youtube_url || ""}
                 className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
-                placeholder="https://www.youtube.com/watch?v=..."
+                placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
               />
 
               {item.youtube_url && (
                 <p className="mt-2 text-xs text-stone-600">
-                  Current YouTube source saved.
+                  Current video link saved.
                 </p>
               )}
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+                Spotify Link
+              </label>
+
+              <input
+                name="spotify_url"
+                defaultValue={item.spotify_url || ""}
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                placeholder="https://open.spotify.com/album/... or /track/..."
+              />
+              <input
+                type="hidden"
+                name="existing_spotify_url"
+                value={item.spotify_url || ""}
+              />
             </div>
           </section>
 

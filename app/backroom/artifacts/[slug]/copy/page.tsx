@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import crypto from "crypto";
 import TitleSlugFields from "@/components/TitleSlugFields";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
+import { spotifyUrl } from "@/lib/spotify";
 
 type Artifact = {
   id: string;
@@ -27,6 +28,7 @@ type Artifact = {
   audio_url: string | null;
   video_url: string | null;
   youtube_url: string | null;
+  spotify_url: string | null;
   private_notes: string | null;
   lyrics: string | null;
   album: string | null;
@@ -46,6 +48,7 @@ type ArtifactOption = {
 const ARTIFACT_TYPES = [
   "Band",
   "Album",
+  "Single",
   "Song",
   "Artwork",
   "Video",
@@ -212,6 +215,7 @@ async function createCopiedArtifact(formData: FormData) {
         })
       : existingVideoUrl;
 
+  const spotify_url = spotifyUrl(String(formData.get("spotify_url") || ""));
   const { error } = await supabase.from("artifacts").insert({
     title,
     slug,
@@ -240,6 +244,7 @@ async function createCopiedArtifact(formData: FormData) {
     audio_url,
     video_url,
     youtube_url: String(formData.get("youtube_url") || "").trim(),
+    ...(spotify_url ? { spotify_url } : {}),
     private_notes: String(formData.get("private_notes") || "").trim(),
     lyrics: String(formData.get("lyrics") || "").trim(),
     album: String(formData.get("album") || "").trim(),
@@ -338,7 +343,15 @@ export default async function CopyArtifactPage({
     notFound();
   }
 
-  const item = artifact as Artifact;
+  const { data: spotifyArtifact } = await supabase
+    .from("artifacts")
+    .select("spotify_url")
+    .eq("id", artifact.id)
+    .maybeSingle();
+  const item = {
+    ...artifact,
+    spotify_url: (spotifyArtifact?.spotify_url as string | null) || null,
+  } as Artifact;
 
   const { data: artifactOptionsData } = await supabase
     .from("artifacts")
@@ -621,14 +634,26 @@ export default async function CopyArtifactPage({
 
             <div>
               <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
-                YouTube Link
+                YouTube or Vimeo Link
               </label>
 
               <input
                 name="youtube_url"
                 defaultValue={item.youtube_url || ""}
                 className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
-                placeholder="https://www.youtube.com/watch?v=..."
+                placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+                Spotify Link
+              </label>
+              <input
+                name="spotify_url"
+                defaultValue={item.spotify_url || ""}
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                placeholder="https://open.spotify.com/album/... or /track/..."
               />
             </div>
           </section>

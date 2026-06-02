@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import TraceWall from "./components/TraceWall";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default function TracesPage() {
   return (

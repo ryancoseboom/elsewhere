@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Elsewhere
 
-## Getting Started
+An archive experience for Halou recordings, images, demos, video, and related
+materials.
 
-First, run the development server:
+## Local development
+
+Install dependencies and run the local site:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). The private editor lives at
+`/backroom`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Required environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+NEXT_PUBLIC_SITE_URL=https://your-live-domain.example
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
+BACKROOM_USER=
+BACKROOM_PASSWORD=
+```
 
-## Learn More
+Keep `SUPABASE_SECRET_KEY` server-only. Never prefix it with `NEXT_PUBLIC_`.
+The older `SUPABASE_SERVICE_ROLE_KEY` variable remains supported for legacy
+projects.
 
-To learn more about Next.js, take a look at the following resources:
+## Launch checklist
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Apply the SQL migrations in `supabase/migrations/` to the production project.
+2. Confirm the `artifact-media` storage bucket is public so published images,
+   audio, and video can load for visitors.
+3. Set every live artifact to public in the Backroom. Attached media follows the
+   parent artifact publication state.
+4. Add album or track Spotify links in each release editor.
+5. Run `npm run build` with the production environment variables before launch.
+6. Visit `/`, `/explore`, `/drift`, `/float`, `/robots.txt`, and `/sitemap.xml`
+   while logged out.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Rollback notes
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Local pre-change snapshots live in `.codex-backups/`. The directory is ignored by
+Git and should not be deployed.

@@ -89,7 +89,7 @@ function Tape({ accent }: { accent?: Trace["accent"] }) {
       <div
         className="absolute -top-4 left-5 z-20 h-8 w-20 rotate-[-8deg] opacity-55 mix-blend-screen"
         style={{
-          backgroundImage: "url('/textures/masking-tape.png')",
+          backgroundImage: "url('/textures/float/masking-tape.jpg')",
           backgroundSize: "cover",
         }}
       />
@@ -97,7 +97,7 @@ function Tape({ accent }: { accent?: Trace["accent"] }) {
       <div
         className="absolute -right-5 top-10 z-20 h-7 w-16 rotate-12 opacity-45 mix-blend-screen"
         style={{
-          backgroundImage: "url('/textures/masking-tape.png')",
+          backgroundImage: "url('/textures/float/masking-tape.jpg')",
           backgroundSize: "cover",
         }}
       />
@@ -125,18 +125,18 @@ export default function TraceCard({ trace }: { trace: Trace }) {
 
       <div
   className="pointer-events-none absolute inset-0 z-10 opacity-[0.22] mix-blend-screen"
-  style={{ backgroundImage: "url('/textures/photocopy-noise.png')" }}
+  style={{ backgroundImage: "url('/textures/float/photocopy-noise.jpg')" }}
 />
 
 <div
   className="pointer-events-none absolute inset-0 z-10 opacity-[0.16] mix-blend-screen"
-  style={{ backgroundImage: "url('/textures/dust-scratches.png')" }}
+  style={{ backgroundImage: "url('/textures/float/dust-scratches.jpg')" }}
 />
 
 <div
   className="pointer-events-none absolute -bottom-4 -right-5 z-10 h-24 w-32 opacity-[0.22] mix-blend-screen"
   style={{
-    backgroundImage: "url('/textures/fingerprint-smudge.png')",
+    backgroundImage: "url('/textures/float/fingerprint-smudge.jpg')",
     backgroundSize: "cover",
   }}
 />

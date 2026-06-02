@@ -51,6 +51,7 @@ export default async function RoomPage({
     .select(
       "id, slug, title, kind, fragment, description, rooms, motifs, atmosphere, image_url"
     )
+    .eq("is_public", true)
     .not("rooms", "is", null)
     .order("created_at", { ascending: false });
 
@@ -66,7 +67,7 @@ export default async function RoomPage({
 
   const copy = roomCopy[slug];
 
-  if (!copy && artifacts.length === 0) {
+  if (artifacts.length === 0) {
     notFound();
   }
 
@@ -94,8 +95,7 @@ export default async function RoomPage({
           </p>
         </header>
 
-        {artifacts.length > 0 ? (
-          <section className="grid gap-5 md:grid-cols-2">
+        <section className="grid gap-5 md:grid-cols-2">
             {artifacts.map((artifact) => (
               <Link
                 key={artifact.id}
@@ -141,14 +141,7 @@ export default async function RoomPage({
                 )}
               </Link>
             ))}
-          </section>
-        ) : (
-          <section className="rounded-3xl border border-dashed border-stone-800 bg-stone-950/40 p-10 text-center">
-            <p className="text-stone-500">
-              Nothing has found this room yet.
-            </p>
-          </section>
-        )}
+        </section>
       </div>
     </main>
   );

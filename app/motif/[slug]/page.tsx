@@ -33,6 +33,7 @@ export default async function MotifPage({
   const { data, error } = await supabase
     .from("artifacts")
     .select("id, slug, title, kind, fragment, description, motifs, atmosphere, image_url")
+    .eq("is_public", true)
     .not("motifs", "is", null)
     .order("created_at", { ascending: false });
 

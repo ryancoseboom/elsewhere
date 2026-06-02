@@ -1,54 +1,22 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-type Artifact = {
-  slug: string;
-  drift_weight: number | null;
-};
-
-function weightedPick(items: Artifact[]) {
-  const weightedItems = items.map((item) => ({
-    ...item,
-    weight: item.drift_weight ?? 100,
-  }));
-
-  const totalWeight = weightedItems.reduce(
-    (sum, item) => sum + Math.max(item.weight, 1),
-    0
-  );
-
-  let random = Math.random() * totalWeight;
-
-  for (const item of weightedItems) {
-    random -= Math.max(item.weight, 1);
-
-    if (random <= 0) {
-      return item;
-    }
-  }
-
-  return weightedItems[0];
-}
+import { shuffle, type ArchiveArtifact } from "@/lib/archive-navigation";
 
 export default async function DriftPage() {
+  await connection();
   const supabase = await createClient();
-
   const { data, error } = await supabase
     .from("artifacts")
-    .select("slug, drift_weight")
-    .eq("is_public", true);
+    .select("id, slug, drift_weight")
+    .eq("is_public", true)
+    .not("slug", "is", null);
 
-  if (error) {
-    throw new Error(error.message);
-  }
+  if (error) throw new Error(error.message);
 
-  const artifacts = (data || []) as Artifact[];
+  const artifacts = shuffle((data || []) as ArchiveArtifact[]);
 
-  if (artifacts.length === 0) {
-    redirect("/");
-  }
+  if (artifacts.length === 0) redirect("/");
 
-  const artifact = weightedPick(artifacts);
-
-  redirect(`/artifact/${artifact.slug}`);
+  redirect(`/drift/${artifacts[0].slug}`);
 }

@@ -12,6 +12,7 @@ import {
 } from "@/lib/musicbrainz";
 import { getOfficialHalouLyrics } from "@/lib/halou-lyrics";
 import { createClient } from "@/lib/supabase/server";
+import { spotifyTrackUrl } from "@/lib/spotify";
 
 type ArtifactType = "Band" | "Album" | "Song" | "Artwork";
 
@@ -39,6 +40,11 @@ type LocalLyricsMetadata = {
 
 type ReviewedOnlineLyricsMetadata = LocalLyricsMetadata & {
   sourceUrl: string;
+};
+
+type SpotifyLinkMetadata = {
+  songId: string;
+  url: string;
 };
 
 type ArchiveMaterialMetadata = {
@@ -553,6 +559,41 @@ export async function importLocalLyricsAction(formData: FormData) {
   redirect(
     `/backroom/import?imported=${encodeURIComponent(
       `${selected.length} lyrics files added to song artifacts.`
+    )}`
+  );
+}
+
+export async function importSpotifyLinksAction(formData: FormData) {
+  const supabase = await createClient();
+  const metadata = JSON.parse(
+    String(formData.get("metadata") || "[]")
+  ) as SpotifyLinkMetadata[];
+  const selected = metadata
+    .map((item) => ({
+      songId: item.songId,
+      url: spotifyTrackUrl(item.url),
+    }))
+    .filter((item) => item.songId && item.url);
+
+  if (selected.length === 0) {
+    throw new Error("Choose at least one matched Spotify track.");
+  }
+
+  for (const item of selected) {
+    const { error } = await supabase
+      .from("artifacts")
+      .update({ spotify_url: item.url })
+      .eq("id", item.songId)
+      .or("artifact_type.eq.Song,kind.eq.Song");
+
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/backroom");
+  revalidatePath("/artifact/[slug]", "page");
+  redirect(
+    `/backroom/import?imported=${encodeURIComponent(
+      `${selected.length} Spotify links added to song artifacts.`
     )}`
   );
 }

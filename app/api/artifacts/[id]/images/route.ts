@@ -71,7 +71,7 @@ export async function POST(
   const supabase = await createClient();
   const { data: parent, error: parentError } = await supabase
     .from("artifacts")
-    .select("id, slug, title, artifact_type, kind, band_id, album_id, song_id")
+    .select("id, slug, title, artifact_type, kind, band_id, album_id, song_id, is_public")
     .eq("id", id)
     .single();
 
@@ -125,10 +125,10 @@ export async function POST(
     image_url: imageData.publicUrl,
     atmosphere: [],
     motifs: [],
-    rooms: [],
+    rooms: ["ephemera:Etc."],
     nearby: [],
     sort_order: sortOrder,
-    is_public: false,
+    is_public: Boolean(parent.is_public),
   });
 
   if (insertError) {

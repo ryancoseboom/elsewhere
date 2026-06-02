@@ -4,22 +4,26 @@ export function proxy(request: NextRequest) {
   const basicAuth = request.headers.get("authorization");
 
   if (request.nextUrl.pathname.startsWith("/backroom")) {
-    if (basicAuth) {
-      const authValue = basicAuth.split(" ")[1];
-      const [user, password] = atob(authValue).split(":");
+    if (basicAuth?.startsWith("Basic ")) {
+      try {
+        const authValue = basicAuth.slice(6);
+        const [user, password] = atob(authValue).split(":");
 
-      if (
-        user === process.env.BACKROOM_USER &&
-        password === process.env.BACKROOM_PASSWORD
-      ) {
-        const response = NextResponse.next();
-        response.cookies.set("elsewhere_backroom", "yes", {
-          httpOnly: true,
-          sameSite: "lax",
-          path: "/",
-          maxAge: 60 * 60 * 8,
-        });
-        return response;
+        if (
+          user === process.env.BACKROOM_USER &&
+          password === process.env.BACKROOM_PASSWORD
+        ) {
+          const response = NextResponse.next();
+          response.cookies.set("elsewhere_backroom", "yes", {
+            httpOnly: true,
+            sameSite: "lax",
+            path: "/",
+            maxAge: 60 * 60 * 8,
+          });
+          return response;
+        }
+      } catch {
+        // Fall through to the authentication challenge.
       }
     }
 

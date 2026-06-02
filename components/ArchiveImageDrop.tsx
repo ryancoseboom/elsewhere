@@ -20,9 +20,9 @@ export default function ArchiveImageDrop({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const textures = [
-    "/textures/photocopy-noise.png",
-    "/textures/fingerprint-smudge.png",
-    "/textures/dust-scratches.png",
+    "/textures/float/photocopy-noise.jpg",
+    "/textures/float/fingerprint-smudge.jpg",
+    "/textures/float/dust-scratches.jpg",
   ];
 
   async function upload(file?: File) {

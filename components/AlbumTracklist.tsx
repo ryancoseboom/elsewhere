@@ -3,6 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArtifactImageButton } from "@/components/ArtifactImageExperience";
+import ArtifactMediaTitle from "@/components/ArtifactMediaTitle";
+import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
+import { getVideoEmbedUrl } from "@/lib/video";
 
 type TrackMedia = {
   id: string;
@@ -19,6 +22,7 @@ export type AlbumTrackPreview = {
   title: string;
   audioUrl?: string;
   lyrics?: string;
+  spotifyUrl?: string;
   demos: TrackMedia[];
   images: TrackMedia[];
   videos: TrackMedia[];
@@ -28,29 +32,15 @@ export type AlbumTrackPreview = {
 function indicatorText(track: AlbumTrackPreview) {
   const indicators = [];
 
-  if (track.demos.length > 0) indicators.push("demos");
+  if (track.audioUrl) indicators.push("listen");
+  if (track.spotifyUrl) indicators.push("spotify");
   if (track.videos.length > 0) indicators.push("videos");
-  if (track.images.length > 0) indicators.push("images");
   if (track.lyrics) indicators.push("lyrics");
+  if (track.demos.length > 0) indicators.push("demos");
+  if (track.images.length > 0) indicators.push("images");
   indicators.push(...track.otherCategories);
 
   return indicators;
-}
-
-function getYouTubeEmbedUrl(url: string) {
-  try {
-    const parsed = new URL(url);
-
-    if (parsed.hostname.includes("youtu.be")) {
-      const id = parsed.pathname.replace("/", "");
-      return id ? `https://www.youtube.com/embed/${id}` : "";
-    }
-
-    const id = parsed.searchParams.get("v");
-    return id ? `https://www.youtube.com/embed/${id}` : url;
-  } catch {
-    return "";
-  }
 }
 
 function TrackThumbnail({
@@ -117,17 +107,36 @@ function TrackThumbnail({
 export default function AlbumTracklist({
   tracks,
   currentArtifactId,
+  canEdit = false,
 }: {
   tracks: AlbumTrackPreview[];
   currentArtifactId: string;
+  canEdit?: boolean;
 }) {
   const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
+  const [expandedImageTrackIds, setExpandedImageTrackIds] = useState<
+    Set<string>
+  >(new Set());
   const [openVideo, setOpenVideo] = useState<TrackMedia | null>(null);
+
+  function toggleMoreImages(trackId: string) {
+    setExpandedImageTrackIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+
+      if (nextIds.has(trackId)) {
+        nextIds.delete(trackId);
+      } else {
+        nextIds.add(trackId);
+      }
+
+      return nextIds;
+    });
+  }
 
   return (
     <section className="mt-7 border-t border-stone-800 pt-5">
       <p className="mb-4 text-[10px] uppercase tracking-[0.28em] text-stone-600">
-        Album tracklist
+        Tracks
       </p>
       <ol className="space-y-3">
         {tracks.map((track, index) => {
@@ -167,7 +176,7 @@ export default function AlbumTracklist({
                     >
                       {track.title}
                     </Link>
-                    {hasChildren && (
+                    {indicators.length > 0 && (
                       <p className="mt-1 text-[10px] leading-4 text-stone-600">
                         {indicators.join(" / ")}
                       </p>
@@ -176,11 +185,11 @@ export default function AlbumTracklist({
                 </div>
 
                 {expanded && (
-                  <div className="mt-3 space-y-3 border-l border-stone-800 pl-3">
+                  <div className="mt-3 border-l border-stone-800 pl-3">
                     {track.audioUrl && (
-                      <div>
+                      <div className="pb-4">
                         <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-stone-600">
-                          Main recording
+                          Listen
                         </p>
                         <audio
                           controls
@@ -190,48 +199,103 @@ export default function AlbumTracklist({
                       </div>
                     )}
 
-                    {track.demos.map((demo) => (
-                      <div key={demo.id}>
-                        <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-stone-600">
-                          {demo.title}
+                    {track.spotifyUrl && (
+                      <div className="border-t border-stone-800 py-4">
+                        <p className="mb-2 text-[9px] uppercase tracking-[0.18em] text-stone-600">
+                          Spotify
                         </p>
-                        {demo.audioUrl && (
-                          <audio
-                            controls
-                            src={demo.audioUrl}
-                            className="h-8 w-full opacity-80"
-                          />
-                        )}
+                        <SpotifyTrackEmbed title={track.title} url={track.spotifyUrl} />
                       </div>
-                    ))}
+                    )}
 
-                    {(track.images.length > 0 || track.videos.length > 0) && (
-                      <div className="grid grid-cols-3 gap-2">
-                        {track.images.map((image) => (
-                          <TrackThumbnail
-                            key={image.id}
-                            item={image}
-                            label="Image"
-                          />
-                        ))}
-                        {track.videos.map((video) => (
-                          <TrackThumbnail
-                            key={video.id}
-                            item={video}
-                            label="Video"
-                            onOpenVideo={setOpenVideo}
-                          />
-                        ))}
+                    {track.videos.length > 0 && (
+                      <div className="border-t border-stone-800 py-4">
+                        <p className="mb-2 text-[9px] uppercase tracking-[0.18em] text-stone-600">
+                          Videos
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {track.videos.map((video) => (
+                            <div key={video.id}>
+                              <TrackThumbnail
+                                item={video}
+                                label="Video"
+                                onOpenVideo={setOpenVideo}
+                              />
+                              <ArtifactMediaTitle
+                                artifactId={video.id}
+                                editable={canEdit}
+                                title={video.title}
+                              />
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
                     {track.lyrics && (
-                      <div>
+                      <div className="border-t border-stone-800 py-4">
                         <p className="mb-2 text-[9px] uppercase tracking-[0.18em] text-stone-600">
                           Lyrics
                         </p>
                         <div className="max-h-72 overflow-y-auto whitespace-pre-line pr-2 font-serif text-sm leading-6 text-stone-500">
                           {track.lyrics}
+                        </div>
+                      </div>
+                    )}
+
+                    {track.demos.length > 0 && (
+                      <div className="space-y-3 border-t border-stone-800 py-4">
+                        <p className="text-[9px] uppercase tracking-[0.18em] text-stone-600">
+                          Demo versions
+                        </p>
+                        {track.demos.map((demo) => (
+                          <div key={demo.id}>
+                            <ArtifactMediaTitle
+                              artifactId={demo.id}
+                              editable={canEdit}
+                              title={demo.title}
+                            />
+                            {demo.audioUrl && (
+                              <audio
+                                controls
+                                src={demo.audioUrl}
+                                className="h-8 w-full opacity-80"
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {track.images.length > 0 && (
+                      <div className="border-t border-stone-800 py-4">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <p className="text-[9px] uppercase tracking-[0.18em] text-stone-600">
+                            Images
+                          </p>
+                          {track.images.length > 3 && (
+                            <button
+                              type="button"
+                              className="text-[9px] uppercase tracking-[0.14em] text-stone-600 transition hover:text-stone-300"
+                              onClick={() => toggleMoreImages(track.id)}
+                            >
+                              {expandedImageTrackIds.has(track.id)
+                                ? "Show fewer"
+                                : `Click for more +${track.images.length - 3}`}
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(expandedImageTrackIds.has(track.id)
+                            ? track.images
+                            : track.images.slice(0, 3)
+                          ).map((image) => (
+                            <TrackThumbnail
+                              key={image.id}
+                              item={image}
+                              label="Image"
+                            />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -262,7 +326,7 @@ export default function AlbumTracklist({
           >
             {openVideo.youtubeUrl ? (
               <iframe
-                src={getYouTubeEmbedUrl(openVideo.youtubeUrl)}
+                src={getVideoEmbedUrl(openVideo.youtubeUrl)}
                 title={openVideo.title}
                 className="h-full w-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

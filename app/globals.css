@@ -154,9 +154,9 @@ body {
 
 .elsewhere-archive-texture {
   pointer-events: none;
-  background-image: url("/textures/fingerprint-smudge.png"),
-    url("/textures/dust-scratches.png"),
-    url("/textures/photocopy-noise.png");
+  background-image: url("/textures/float/fingerprint-smudge.jpg"),
+    url("/textures/float/dust-scratches.jpg"),
+    url("/textures/float/photocopy-noise.jpg");
   background-position: center, center, center;
   background-size: cover, cover, 150%;
   mix-blend-mode: screen;
@@ -180,22 +180,29 @@ button:hover > .elsewhere-archive-texture {
 .elsewhere-float-drift-image {
   animation: elsewhere-float-column var(--float-column-duration) ease-in-out
     var(--float-column-delay) infinite alternate;
+  animation-play-state: var(--float-tile-play-state, running);
 }
 
 .elsewhere-float-tile-frame {
   grid-column: span var(--float-column-span);
   grid-row: span var(--float-row-span);
   min-height: 0;
-  transform: rotate(var(--float-edge-rotation, 0deg));
+  transform: translate3d(
+      var(--float-overlap-x, 0),
+      var(--float-overlap-y, 0),
+      0
+    )
+    rotate(var(--float-edge-rotation, 0deg))
+    scale(var(--float-overlap-scale, 1));
 }
 
 .elsewhere-float-edge {
   pointer-events: none;
-  background-image: url("/textures/torn-paper-edge.png");
+  background-image: url("/textures/float/torn-paper-edge.jpg");
   background-position: center;
   background-size: 125% 118%;
   mix-blend-mode: screen;
-  opacity: 0.08;
+  opacity: var(--float-edge-opacity, 0.08);
 }
 
 .elsewhere-float-texture,
@@ -259,6 +266,12 @@ button:hover > .elsewhere-archive-texture {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-template-rows: repeat(8, minmax(0, 1fr));
   pointer-events: none;
+  transform: translate3d(
+    var(--float-pointer-x, 0px),
+    var(--float-pointer-y, 0px),
+    0
+  );
+  transition: transform 1400ms ease-out;
 }
 
 .elsewhere-float-image-fragment {
@@ -294,6 +307,35 @@ button:hover > .elsewhere-archive-texture {
   mix-blend-mode: screen;
   animation: elsewhere-float-image-fragment var(--float-image-duration) ease-in-out
     var(--float-image-delay) infinite alternate;
+}
+
+.elsewhere-float-hero-interruption {
+  z-index: 18;
+  overflow: hidden;
+  pointer-events: none;
+  filter: grayscale(44%) saturate(72%) contrast(94%);
+  mix-blend-mode: screen;
+  transition:
+    opacity 2200ms ease-in-out,
+    transform 5200ms ease-out;
+}
+
+.elsewhere-float-hero-interruption::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background-image: url("/textures/float/dust-scratches.jpg"),
+    url("/textures/float/torn-paper-edge.jpg");
+  background-position: center;
+  background-size: cover, 115% 112%;
+  mix-blend-mode: screen;
+  opacity: 0.18;
+}
+
+.elsewhere-float-paused *,
+.elsewhere-float-paused *::before,
+.elsewhere-float-paused *::after {
+  animation-play-state: paused !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

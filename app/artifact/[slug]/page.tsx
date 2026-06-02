@@ -6,12 +6,20 @@ import AudioFrame from "@/components/AudioFrame";
 import AlbumTracklist, {
   type AlbumTrackPreview,
 } from "@/components/AlbumTracklist";
+import ArchiveHeroImageDrop from "@/components/ArchiveHeroImageDrop";
 import ArchiveImageDrop from "@/components/ArchiveImageDrop";
+import ArchiveAudioDrop from "@/components/ArchiveAudioDrop";
+import ArchiveVideoDrop from "@/components/ArchiveVideoDrop";
+import { getVideoEmbedUrl, getYouTubeThumbnailUrl } from "@/lib/video";
+import ArtifactEphemeraPaneSelect from "@/components/ArtifactEphemeraPaneSelect";
+import { EPHEMERA_PANES, type EphemeraPane } from "@/lib/ephemera";
 import ArtifactImageCaption from "@/components/ArtifactImageCaption";
+import ArtifactMediaTitle from "@/components/ArtifactMediaTitle";
 import ArtifactImageExperience, {
   ArtifactImageButton,
 } from "@/components/ArtifactImageExperience";
 import ArtifactSectionOrder from "@/components/ArtifactSectionOrder";
+import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
 
 type Artifact = {
   id: string;
@@ -34,10 +42,12 @@ type Artifact = {
   lyrics: string | null;
   video_url: string | null;
   youtube_url: string | null;
+  spotify_url: string | null;
   album: string | null;
   year: string | null;
   era: string | null;
   sort_order: number | null;
+  rooms: string[] | null;
 };
 
 function normalizeList(items: string[] | null) {
@@ -89,33 +99,15 @@ function scoreNearby(current: Artifact, candidate: Artifact) {
   return score;
 }
 
-function getYouTubeEmbedUrl(url: string | null) {
-  if (!url) return "";
+function sharedThreads(current: Artifact, candidate: Artifact) {
+  const candidateThreads = new Set([
+    ...normalizeList(candidate.motifs),
+    ...normalizeList(candidate.atmosphere),
+  ]);
 
-  try {
-    const parsed = new URL(url);
-
-    if (parsed.hostname.includes("youtu.be")) {
-      const id = parsed.pathname.replace("/", "");
-      return id ? `https://www.youtube.com/embed/${id}` : "";
-    }
-
-    if (parsed.hostname.includes("youtube.com")) {
-      const id = parsed.searchParams.get("v");
-      return id ? `https://www.youtube.com/embed/${id}` : url;
-    }
-
-    return url;
-  } catch {
-    return "";
-  }
-}
-
-function getYouTubeThumbnailUrl(url: string | null) {
-  const embedUrl = getYouTubeEmbedUrl(url);
-  const id = embedUrl.split("/embed/")[1]?.split("?")[0];
-
-  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : "";
+  return [...(current.motifs || []), ...(current.atmosphere || [])].filter(
+    (thread) => candidateThreads.has(thread.toLowerCase().trim())
+  );
 }
 
 function ChildLinkList({
@@ -272,14 +264,39 @@ function addChildHref(artifact: Artifact) {
   return `/backroom/artifacts/new?${params.toString()}`;
 }
 
-function AddChildArtifactLink({ artifact }: { artifact: Artifact }) {
+function ArchiveTools({ artifact }: { artifact: Artifact }) {
   return (
-    <Link
-      href={addChildHref(artifact)}
-      className="border border-stone-700 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-stone-400 transition hover:border-stone-400 hover:text-stone-100"
-    >
-      Add child artifact
-    </Link>
+    <details className="group relative">
+      <summary className="cursor-pointer list-none border border-stone-800 px-3 py-2 text-[9px] uppercase tracking-[0.24em] text-stone-600 transition hover:border-stone-600 hover:text-stone-300">
+        Archive tools
+      </summary>
+      <div className="absolute right-0 top-full z-40 mt-2 w-52 border border-stone-800 bg-[#11100e] p-2 shadow-2xl">
+        <Link
+          href={`/backroom/artifacts/${artifact.slug}/edit`}
+          className="block px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-stone-400 transition hover:bg-stone-900 hover:text-stone-100"
+        >
+          Edit this page
+        </Link>
+        <Link
+          href={addChildHref(artifact)}
+          className="block px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-stone-400 transition hover:bg-stone-900 hover:text-stone-100"
+        >
+          Add attached material
+        </Link>
+        <Link
+          href={`/backroom/artifacts/${artifact.slug}/copy`}
+          className="block px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-stone-400 transition hover:bg-stone-900 hover:text-stone-100"
+        >
+          Copy this page
+        </Link>
+        <Link
+          href="/backroom"
+          className="block px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-stone-600 transition hover:bg-stone-900 hover:text-stone-300"
+        >
+          Open backroom
+        </Link>
+      </div>
+    </details>
   );
 }
 
@@ -293,9 +310,9 @@ function PlaceholderVisual({
   index?: number;
 }) {
   const textures = [
-    "/textures/photocopy-noise.png",
-    "/textures/fingerprint-smudge.png",
-    "/textures/dust-scratches.png",
+    "/textures/float/photocopy-noise.jpg",
+    "/textures/float/fingerprint-smudge.jpg",
+    "/textures/float/dust-scratches.jpg",
   ];
 
   return (
@@ -319,12 +336,14 @@ function VisualCard({
   index = 0,
   dropTargetArtifactId,
   order,
+  pane,
 }: {
   item?: Artifact;
   className?: string;
   index?: number;
   dropTargetArtifactId?: string;
   order?: { canMoveUp: boolean; canMoveDown: boolean; canDelete?: boolean };
+  pane?: EphemeraPane;
 }) {
   if (!item) {
     if (dropTargetArtifactId) {
@@ -361,14 +380,17 @@ function VisualCard({
             className="absolute inset-0 opacity-60"
             style={{
               backgroundImage:
-                "linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(/textures/photocopy-noise.png)",
+                "linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(/textures/float/photocopy-noise.jpg)",
               backgroundSize: "cover",
             }}
           />
         )}
         {order && (
-          <span className="absolute right-2 top-2">
+          <span className="absolute right-2 top-2 flex flex-col items-end gap-1">
             <ArtifactSectionOrder artifactId={item.id} {...order} />
+            {pane && (
+              <ArtifactEphemeraPaneSelect artifactId={item.id} pane={pane} />
+            )}
           </span>
         )}
       </div>
@@ -378,6 +400,233 @@ function VisualCard({
         title={item.title}
       />
     </div>
+  );
+}
+
+function getEphemeraPane(item: Artifact): EphemeraPane {
+  const marker = (item.rooms || []).find((room) => room.startsWith("ephemera:"));
+  const pane = marker?.slice("ephemera:".length);
+
+  return EPHEMERA_PANES.includes(pane as EphemeraPane)
+    ? (pane as EphemeraPane)
+    : "Etc.";
+}
+
+function releaseYear(release: Artifact) {
+  const match = release.year?.match(/\d{4}/);
+  return match ? Number(match[0]) : 0;
+}
+
+function BandReleaseCard({
+  release,
+  presentationType,
+}: {
+  release: Artifact;
+  presentationType: "Album" | "Single";
+}) {
+  return (
+    <Link
+      href={`/artifact/${release.slug}`}
+      className="group block"
+    >
+      <div className="relative aspect-square overflow-hidden border border-stone-800 bg-stone-900">
+        {release.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={release.image_url}
+            alt={`${release.title} cover`}
+            className="h-full w-full object-cover opacity-80 transition duration-500 group-hover:scale-105 group-hover:opacity-100"
+          />
+        ) : (
+          <div
+            className="h-full w-full opacity-60 transition group-hover:opacity-90"
+            style={{
+              backgroundImage:
+                "linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(/textures/float/photocopy-noise.jpg)",
+              backgroundSize: "cover",
+            }}
+          />
+        )}
+      </div>
+      <p className="mt-3 font-serif text-lg text-stone-300 transition group-hover:text-white">
+        {release.title}
+      </p>
+      <p className="mt-1 text-[9px] uppercase tracking-[0.2em] text-stone-600">
+        {[presentationType, release.year].filter(Boolean).join(" / ")}
+      </p>
+    </Link>
+  );
+}
+
+function BandReleaseSection({
+  title,
+  releases,
+  presentationType,
+}: {
+  title: string;
+  releases: Artifact[];
+  presentationType: "Album" | "Single";
+}) {
+  if (releases.length === 0) return null;
+
+  return (
+    <section className="border-t border-stone-800 pt-7">
+      <p className="mb-5 text-[10px] uppercase tracking-[0.3em] text-stone-600">
+        {title}
+      </p>
+      <div className="grid gap-x-4 gap-y-7 sm:grid-cols-2 xl:grid-cols-3">
+        {releases.map((release) => (
+          <BandReleaseCard
+            key={release.id}
+            release={release}
+            presentationType={presentationType}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function EphemeraPaneSection({
+  pane,
+  items,
+  allItems,
+  artifactId,
+  canEdit,
+}: {
+  pane: EphemeraPane;
+  items: Artifact[];
+  allItems: Artifact[];
+  artifactId: string;
+  canEdit: boolean;
+}) {
+  const showDropTarget = canEdit && pane === "Etc.";
+
+  if (items.length === 0 && !showDropTarget) return null;
+
+  return (
+    <section className="border-t border-stone-800 pt-5">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.28em] text-stone-600">
+        {pane}
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {items.map((item) => {
+          const index = allItems.findIndex((candidate) => candidate.id === item.id);
+
+          return (
+            <VisualCard
+              key={item.id}
+              item={item}
+              index={index}
+              pane={getEphemeraPane(item)}
+              order={
+                canEdit
+                  ? {
+                      canMoveUp: index > 0,
+                      canMoveDown: index < allItems.length - 1,
+                      canDelete: ["Artwork", "Design", "Photo"].includes(
+                        getArtifactType(item)
+                      ),
+                    }
+                  : undefined
+              }
+            />
+          );
+        })}
+        {showDropTarget && (
+          <VisualCard
+            dropTargetArtifactId={artifactId}
+            index={allItems.length}
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function BandScrapbook({
+  artifact,
+  breadcrumbs,
+  albums,
+  singles,
+  nearby,
+  canEdit,
+}: {
+  artifact: Artifact;
+  breadcrumbs: { title: string; slug: string }[];
+  albums: Artifact[];
+  singles: Artifact[];
+  nearby: Artifact[];
+  canEdit: boolean;
+}) {
+  const releaseImages = [...albums, ...singles]
+    .filter((release) => release.image_url)
+    .map((release) => ({ src: release.image_url || "", alt: release.title }));
+
+  return (
+    <main className="min-h-screen bg-[#11100e] px-5 py-8 text-stone-200">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-wrap items-center justify-between gap-5">
+          <Breadcrumbs crumbs={breadcrumbs} />
+          {canEdit && <ArchiveTools artifact={artifact} />}
+        </div>
+
+        <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)]">
+          <aside>
+            {(artifact.image_url || canEdit) && <div className="border border-stone-700 bg-black p-3">
+              <ArchiveHeroImageDrop
+                artifactId={artifact.id}
+                alt={`${artifact.title} band image`}
+                canEdit={canEdit}
+                imageUrl={artifact.image_url}
+                label="Band image"
+              />
+            </div>}
+
+            <div className="mt-12">
+              <RelatedGrid items={nearby} />
+            </div>
+          </aside>
+
+          <section>
+            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
+              elsewhere / band
+            </p>
+            <h1 className="mt-4 font-serif text-7xl leading-none text-stone-100 md:text-9xl">
+              {artifact.title}
+            </h1>
+            {releaseImages.length > 0 && (
+              <div className="mt-6">
+                <ArtifactImageExperience images={releaseImages} />
+              </div>
+            )}
+            {artifact.fragment && (
+              <p className="mt-5 max-w-2xl font-serif text-xl italic leading-8 text-stone-300">
+                “{artifact.fragment}”
+              </p>
+            )}
+            {artifact.description && (
+              <p className="mt-5 max-w-2xl text-sm leading-7 text-stone-500">
+                {artifact.description}
+              </p>
+            )}
+
+            <div className="mt-10 space-y-10">
+              <BandReleaseSection
+                title="Albums"
+                releases={albums}
+                presentationType="Album"
+              />
+              <BandReleaseSection
+                title="Singles"
+                releases={singles}
+                presentationType="Single"
+              />
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -392,6 +641,8 @@ function MediaList({
   placeholder: string;
   canEdit?: boolean;
 }) {
+  if (items.length === 0 && !canEdit) return null;
+
   return (
     <section className="border-t border-stone-800 pt-6">
       <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
@@ -402,19 +653,25 @@ function MediaList({
           {items.map((item, index) => (
             <div key={item.id}>
               <div className="flex items-center justify-between gap-3">
-                <Link
-                  href={`/artifact/${item.slug}`}
-                  className="text-sm font-serif text-stone-300 hover:text-white"
-                >
-                  {item.title}
-                </Link>
+                {canEdit && item.parent_id ? (
+                  <ArtifactMediaTitle
+                    artifactId={item.id}
+                    editable
+                    title={item.title}
+                  />
+                ) : (
+                  <Link
+                    href={`/artifact/${item.slug}`}
+                    className="min-w-0 flex-1 text-sm font-serif text-stone-300 hover:text-white"
+                  >
+                    {item.title}
+                  </Link>
+                )}
                 {canEdit && (
                   <ArtifactSectionOrder
                     artifactId={item.id}
                     canMoveUp={index > 0}
                     canMoveDown={index < items.length - 1}
-                    canDelete
-                    deleteKind="video"
                   />
                 )}
               </div>
@@ -435,43 +692,106 @@ function MediaList({
   );
 }
 
+function AudioGallery({
+  items,
+  dropTargetArtifactId,
+}: {
+  items: Artifact[];
+  dropTargetArtifactId?: string;
+}) {
+  if (items.length === 0 && !dropTargetArtifactId) return null;
+
+  return (
+    <section className="border-t border-stone-800 pt-6">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
+        Listen
+      </p>
+      <div className="grid gap-4 md:grid-cols-2">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className="flex min-h-36 flex-col justify-end border border-stone-800 bg-stone-950 p-4"
+          >
+            {dropTargetArtifactId && item.parent_id ? (
+              <div className="mb-3 flex min-w-0">
+                <ArtifactMediaTitle
+                  artifactId={item.id}
+                  editable
+                  title={item.title}
+                />
+              </div>
+            ) : (
+              <Link
+                href={`/artifact/${item.slug}`}
+                className="mb-3 block text-sm font-serif text-stone-300 hover:text-white"
+              >
+                {item.title}
+              </Link>
+            )}
+            <audio controls src={item.audio_url || ""} className="h-8 w-full opacity-80" />
+          </div>
+        ))}
+        {dropTargetArtifactId && (
+          <ArchiveAudioDrop artifactId={dropTargetArtifactId} />
+        )}
+      </div>
+    </section>
+  );
+}
+
 function VideoGallery({
   items,
   placeholder,
   canEdit = false,
+  dropTargetArtifactId,
 }: {
   items: Artifact[];
   placeholder: string;
   canEdit?: boolean;
+  dropTargetArtifactId?: string;
 }) {
+  if (items.length === 0 && !dropTargetArtifactId && !canEdit) return null;
+
   return (
     <section className="border-t border-stone-800 pt-6">
       <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
-        Videos
+        Watch
       </p>
-      {items.length > 0 ? (
+      {items.length > 0 || dropTargetArtifactId ? (
         <div className="grid gap-4 md:grid-cols-2">
           {items.map((item, index) => (
             <div key={item.id}>
               <div className="mb-2 flex items-center justify-between gap-3">
-                <Link
-                  href={`/artifact/${item.slug}`}
-                  className="block text-sm font-serif text-stone-300 hover:text-white"
-                >
-                  {item.title}
-                </Link>
+                {canEdit && item.parent_id ? (
+                  <div className="min-w-0 flex-1">
+                    <ArtifactMediaTitle
+                      artifactId={item.id}
+                      editable
+                      title={item.title}
+                    />
+                  </div>
+                ) : (
+                  <Link
+                    href={`/artifact/${item.slug}`}
+                    className="block min-w-0 flex-1 text-sm font-serif text-stone-300 hover:text-white"
+                  >
+                    {item.title}
+                  </Link>
+                )}
                 {canEdit && item.parent_id && (
                   <ArtifactSectionOrder
                     artifactId={item.id}
                     canMoveUp={index > 0}
                     canMoveDown={index < items.length - 1}
+                    canDelete
+                    deleteKind="video"
                   />
                 )}
               </div>
               {item.youtube_url ? (
                 <div className="aspect-video border border-stone-800 bg-black">
                   <iframe
-                    src={getYouTubeEmbedUrl(item.youtube_url)}
+                    src={getVideoEmbedUrl(item.youtube_url)}
                     title={item.title}
                     className="h-full w-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -487,6 +807,9 @@ function VideoGallery({
               )}
             </div>
           ))}
+          {dropTargetArtifactId && (
+            <ArchiveVideoDrop artifactId={dropTargetArtifactId} />
+          )}
         </div>
       ) : (
         <p className="text-sm italic leading-6 text-stone-700">{placeholder}</p>
@@ -495,13 +818,13 @@ function VideoGallery({
   );
 }
 
-function RelatedGrid({ items }: { items: Artifact[] }) {
+function RelatedGrid({ items }: { items: (Artifact & { shared?: string[] })[] }) {
   if (items.length === 0) return null;
 
   return (
     <section>
       <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
-        Related and similar artifacts
+        Nearby
       </p>
       <div className="grid gap-px bg-stone-800 sm:grid-cols-2">
         {items.map((item) => (
@@ -511,6 +834,11 @@ function RelatedGrid({ items }: { items: Artifact[] }) {
             className="bg-neutral-950 p-4 transition hover:bg-stone-900"
           >
             <p className="font-serif text-lg text-stone-300">{item.title}</p>
+            {(item.shared || []).length > 0 && (
+              <p className="mt-2 text-[9px] uppercase tracking-[0.18em] text-stone-700">
+                {(item.shared || []).slice(0, 3).join(" / ")}
+              </p>
+            )}
             {item.fragment && (
               <p className="mt-2 line-clamp-2 text-xs italic leading-5 text-stone-600">
                 {item.fragment}
@@ -554,7 +882,7 @@ function EditorialDossier({
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-center justify-between gap-5">
           <Breadcrumbs crumbs={breadcrumbs} />
-          {canEdit && <AddChildArtifactLink artifact={artifact} />}
+          {canEdit && <ArchiveTools artifact={artifact} />}
         </div>
 
         <header className="mt-14 border-y border-stone-800 py-8">
@@ -572,36 +900,41 @@ function EditorialDossier({
             </p>
           </div>
           <div className="mt-6">
-            <ArtifactImageExperience images={floatImages} />
+            <ArtifactImageExperience
+              images={floatImages}
+              spotifyUrl={artifact.spotify_url}
+            />
           </div>
         </header>
 
         <div className="mt-8 grid gap-10 lg:grid-cols-[1.25fr_0.75fr]">
           <section>
-            {artifact.image_url ? (
-              <ArtifactImageButton
-                src={artifact.image_url}
-                alt={artifact.title}
-                alwaysColor
-                className="block w-full"
-                imageClassName="max-h-[42rem] w-full border border-stone-800 object-cover opacity-90"
-              />
-            ) : (
-              <PlaceholderVisual
-                label="Primary cover"
-                className="min-h-[28rem]"
-              />
-            )}
+            <ArchiveHeroImageDrop
+              artifactId={artifact.id}
+              alt={artifact.title}
+              canEdit={canEdit}
+              imageUrl={artifact.image_url}
+              label="Primary cover"
+              imageClassName="max-h-[42rem] w-full object-cover opacity-90"
+            />
 
             {artifact.audio_url ? (
               <AudioFrame
                 audioUrl={artifact.audio_url}
                 imageUrl={artifact.image_url}
               />
-            ) : (
+            ) : canEdit ? (
               <p className="mt-4 border border-stone-800 p-4 text-xs uppercase tracking-[0.2em] text-stone-700">
                 Primary recording awaiting audio file
               </p>
+            ) : null}
+
+            {artifact.spotify_url && (
+              <SpotifyTrackEmbed
+                title={artifact.title}
+                url={artifact.spotify_url}
+                className="mt-4"
+              />
             )}
 
             {artifact.lyrics && (
@@ -641,20 +974,23 @@ function EditorialDossier({
           </aside>
         </div>
 
-        <section className="mt-14">
+        {(visualItems.length > 0 || canEdit) && <section className="mt-14">
           <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
             Alternate covers and visual miscellania
           </p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[0, 1, 2, 3].map((index) => (
+            {Array.from(
+              { length: canEdit ? Math.max(4, visualItems.length) : visualItems.length },
+              (_, index) => (
               <VisualCard
                 key={visualItems[index]?.id || `placeholder-${index}`}
                 item={visualItems[index]}
                 index={index}
               />
-            ))}
+              )
+            )}
           </div>
-        </section>
+        </section>}
 
         <VideoGallery
           items={videos}
@@ -671,24 +1007,38 @@ function EditorialDossier({
 
 function VisualScrapbook({
   artifact,
+  presentationType,
+  primaryAudioUrl,
+  primarySpotifyUrl,
+  primaryLyrics,
+  isAlbumPage,
+  isSingleRelease,
   coverImageUrl,
   albumTrackPreviews,
   breadcrumbs,
   artwork,
   videos,
   demos,
+  audioChildren,
   documents,
   miscellaneous,
   nearby,
   canEdit,
 }: {
   artifact: Artifact;
+  presentationType: string;
+  primaryAudioUrl: string | null;
+  primarySpotifyUrl: string | null;
+  primaryLyrics: string | null;
+  isAlbumPage: boolean;
+  isSingleRelease: boolean;
   coverImageUrl: string | null;
   albumTrackPreviews: AlbumTrackPreview[];
   breadcrumbs: { title: string; slug: string }[];
   artwork: Artifact[];
   videos: Artifact[];
   demos: Artifact[];
+  audioChildren: Artifact[];
   documents: Artifact[];
   miscellaneous: Artifact[];
   nearby: Artifact[];
@@ -698,66 +1048,95 @@ function VisualScrapbook({
   const floatImages = visualItems
     .filter((item) => item.image_url)
     .map((item) => ({ src: item.image_url || "", alt: item.title }));
-  const visualSlotCount = Math.max(
-    4,
-    visualItems.length + (canEdit ? 1 : 0)
-  );
+  const visualSlotCount = canEdit
+    ? Math.max(4, visualItems.length + 1)
+    : visualItems.length;
+  const isSongPage = getArtifactType(artifact) === "Song";
+  const threads = [
+    ...(artifact.atmosphere || []).map((label) => ({
+      href: `/atmosphere/${encodeURIComponent(label.toLowerCase().replaceAll(" ", "-"))}`,
+      label,
+    })),
+    ...(artifact.motifs || []).map((label) => ({
+      href: `/motif/${encodeURIComponent(label.toLowerCase().replaceAll(" ", "-"))}`,
+      label,
+    })),
+  ];
 
   return (
     <main className="min-h-screen bg-[#11100e] px-5 py-8 text-stone-200">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-center justify-between gap-5">
           <Breadcrumbs crumbs={breadcrumbs} />
-          {canEdit && <AddChildArtifactLink artifact={artifact} />}
+          {canEdit && <ArchiveTools artifact={artifact} />}
         </div>
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)]">
           <aside>
-            {coverImageUrl ? (
-              <div className="border border-stone-700 bg-black p-3">
-                <ArtifactImageButton
-                  src={coverImageUrl}
-                  alt={`${artifact.title} cover`}
-                  alwaysColor
-                  className="block w-full"
-                  imageClassName="h-auto w-full object-contain"
-                />
-              </div>
-            ) : (
-              <PlaceholderVisual
+            {(coverImageUrl || canEdit) && <div className="border border-stone-700 bg-black p-3">
+              <ArchiveHeroImageDrop
+                artifactId={artifact.id}
+                alt={`${artifact.title} cover`}
+                canEdit={canEdit}
+                imageUrl={coverImageUrl}
                 label="Cover image"
-                className="aspect-square min-h-0"
+              />
+            </div>}
+
+            {primarySpotifyUrl && (
+              <SpotifyTrackEmbed
+                title={artifact.title}
+                url={primarySpotifyUrl}
+                className="mt-4"
               />
             )}
 
-            {albumTrackPreviews.length > 0 && (
+            {isAlbumPage && albumTrackPreviews.length > 0 && !isSingleRelease && (
               <AlbumTracklist
                 tracks={albumTrackPreviews}
                 currentArtifactId={artifact.id}
+                canEdit={canEdit}
               />
             )}
 
-            {artifact.audio_url && (
+            {primaryAudioUrl && !isSongPage && (
               <AudioFrame
-                audioUrl={artifact.audio_url}
+                audioUrl={primaryAudioUrl}
                 imageUrl={artifact.image_url}
               />
             )}
 
             <div className="mt-12 space-y-8">
-              <MediaList
-                title="Demo versions and alternate takes"
-                items={demos}
-                placeholder="Alternate recordings will appear here when attached."
-                canEdit={canEdit}
-              />
+              {isSongPage && (
+                <AudioGallery
+                  items={[
+                    ...(artifact.audio_url ? [artifact] : []),
+                    ...demos,
+                    ...audioChildren,
+                  ]}
+                  dropTargetArtifactId={canEdit ? artifact.id : undefined}
+                />
+              )}
+              {!isAlbumPage && !isSongPage && (
+                <MediaList
+                  title="Listen"
+                  items={demos}
+                  placeholder="Alternate recordings will appear here when attached."
+                  canEdit={canEdit}
+                />
+              )}
               <VideoGallery
                 items={videos}
                 placeholder="Moving-image fragments will appear here when attached."
                 canEdit={canEdit}
+                dropTargetArtifactId={
+                  canEdit && (isAlbumPage || isSongPage)
+                    ? artifact.id
+                    : undefined
+                }
               />
               <MediaList
-                title="Promotional traces"
+                title="Paper traces"
                 items={documents}
                 placeholder="Flyers, clippings, and press materials will appear here."
               />
@@ -767,13 +1146,16 @@ function VisualScrapbook({
 
           <section>
             <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-              recovered signal / {getArtifactType(artifact)}
+              elsewhere / {presentationType}
             </p>
             <h1 className="mt-4 font-serif text-7xl leading-none text-stone-100 md:text-9xl">
               {artifact.title}
             </h1>
             <div className="mt-6">
-              <ArtifactImageExperience images={floatImages} />
+              <ArtifactImageExperience
+                images={floatImages}
+                spotifyUrl={primarySpotifyUrl}
+              />
             </div>
             {artifact.fragment && (
               <p className="mt-5 max-w-2xl font-serif text-xl italic leading-8 text-stone-300">
@@ -781,35 +1163,80 @@ function VisualScrapbook({
               </p>
             )}
 
-            <div className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: visualSlotCount }, (_, index) => (
-                <VisualCard
-                  key={visualItems[index]?.id || `scrap-${index}`}
-                  item={visualItems[index]}
-                  index={index}
-                  dropTargetArtifactId={canEdit ? artifact.id : undefined}
-                  order={
-                    canEdit && visualItems[index]
-                      ? {
-                          canMoveUp: index > 0,
-                          canMoveDown: index < visualItems.length - 1,
-              canDelete: ["Artwork", "Design", "Photo"].includes(
-                getArtifactType(visualItems[index])
-              ),
-                        }
-                      : undefined
-                  }
-                />
-              ))}
-            </div>
+            {visualSlotCount > 0 && (isAlbumPage || isSingleRelease) && (
+              <section className="mt-9">
+                <p className="mb-6 text-[10px] uppercase tracking-[0.36em] text-stone-500">
+                  Ephemera
+                </p>
+                <div className="space-y-8">
+                  {EPHEMERA_PANES.map((pane) => (
+                    <EphemeraPaneSection
+                      key={pane}
+                      pane={pane}
+                      items={visualItems.filter(
+                        (item) => getEphemeraPane(item) === pane
+                      )}
+                      allItems={visualItems}
+                      artifactId={artifact.id}
+                      canEdit={canEdit}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
 
-            {artifact.lyrics && (
+            {visualSlotCount > 0 && !isAlbumPage && !isSingleRelease && (
+              <div className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: visualSlotCount }, (_, index) => (
+                  <VisualCard
+                    key={visualItems[index]?.id || `scrap-${index}`}
+                    item={visualItems[index]}
+                    index={index}
+                    dropTargetArtifactId={canEdit ? artifact.id : undefined}
+                    order={
+                      canEdit && visualItems[index]
+                        ? {
+                            canMoveUp: index > 0,
+                            canMoveDown: index < visualItems.length - 1,
+                            canDelete: ["Artwork", "Design", "Photo"].includes(
+                              getArtifactType(visualItems[index])
+                            ),
+                          }
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            )}
+
+            {threads.length > 0 && (
+              <section className="mt-12 border-t border-stone-800 pt-7">
+                <p className="mb-4 text-[10px] uppercase tracking-[0.3em] text-stone-600">
+                  Threads
+                </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {threads.map((thread) =>
+                    thread.href ? (
+                      <Link
+                        key={`${thread.href}-${thread.label}`}
+                        href={thread.href}
+                        className="text-xs uppercase tracking-[0.18em] text-stone-500 transition hover:text-stone-200"
+                      >
+                        {thread.label}
+                      </Link>
+                    ) : null
+                  )}
+                </div>
+              </section>
+            )}
+
+            {primaryLyrics && (
               <section className="mt-12 border-t border-stone-800 pt-8">
                 <p className="mb-5 text-[10px] uppercase tracking-[0.32em] text-stone-600">
-                  Lyrics / recovered text
+                  Words
                 </p>
                 <div className="whitespace-pre-line font-serif text-xl leading-9 text-stone-300">
-                  {artifact.lyrics}
+                  {primaryLyrics}
                 </div>
               </section>
             )}
@@ -841,28 +1268,48 @@ export default async function ArtifactPage({
     hasValidBackroomAuthorization((await headers()).get("authorization"));
   const supabase = await createClient();
 
-  const { data: artifact, error } = await supabase
+  let artifactQuery = supabase
     .from("artifacts")
     .select(
-      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, nearby, image_url, audio_url, video_url, youtube_url, lyrics, album, year, era, sort_order"
+      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, album, year, era, sort_order"
     )
-    .eq("slug", slug)
-    .single();
+    .eq("slug", slug);
+  if (!canEdit) artifactQuery = artifactQuery.eq("is_public", true);
+  const { data: artifact, error } = await artifactQuery.single();
 
   if (error || !artifact) {
     notFound();
   }
 
-  const currentArtifact = artifact as Artifact;
+  let spotifyQuery = supabase
+    .from("artifacts")
+    .select("id, spotify_url");
+  if (!canEdit) spotifyQuery = spotifyQuery.eq("is_public", true);
+  const { data: spotifyData } = await spotifyQuery;
+  const spotifyUrls = new Map(
+    (spotifyData || []).map((item) => [
+      item.id as string,
+      item.spotify_url as string | null,
+    ])
+  );
+  const currentArtifact = {
+    ...artifact,
+    spotify_url: spotifyUrls.get(artifact.id) || null,
+  } as Artifact;
 
-  const { data: allArtifactsData } = await supabase
+  let allArtifactsQuery = supabase
     .from("artifacts")
     .select(
-      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, nearby, image_url, audio_url, video_url, youtube_url, lyrics, album, year, era, sort_order"
+      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, album, year, era, sort_order"
     )
     .neq("slug", currentArtifact.slug);
+  if (!canEdit) allArtifactsQuery = allArtifactsQuery.eq("is_public", true);
+  const { data: allArtifactsData } = await allArtifactsQuery;
 
-  const allArtifacts = (allArtifactsData || []) as Artifact[];
+  const allArtifacts = (allArtifactsData || []).map((item) => ({
+    ...item,
+    spotify_url: spotifyUrls.get(item.id) || null,
+  })) as Artifact[];
 
   const artifactMap = new Map<string, Artifact>();
   allArtifacts.forEach((item) => artifactMap.set(item.id, item));
@@ -901,16 +1348,67 @@ export default async function ArtifactPage({
   const songs = childArtifacts.filter(
     (child) => getArtifactType(child) === "Song"
   );
+  const currentArtifactType = getArtifactType(currentArtifact);
+  const isBandPage = currentArtifactType === "Band";
+  const isAlbumPage = currentArtifactType === "Album";
+  const isSingleRelease =
+    currentArtifactType === "Single" || (isAlbumPage && songs.length === 1);
+  const legacySingleTrack = isSingleRelease && songs.length === 1 ? songs[0] : undefined;
+  const presentationChildArtifacts = legacySingleTrack
+    ? [
+        ...new Map(
+          [
+            ...childArtifacts.filter((child) => child.id !== legacySingleTrack.id),
+            ...allArtifacts.filter(
+              (candidate) =>
+                candidate.id !== legacySingleTrack.id &&
+                (candidate.parent_id === legacySingleTrack.id ||
+                  candidate.parent_slug === legacySingleTrack.slug ||
+                  candidate.song_id === legacySingleTrack.id)
+            ),
+          ].map((child) => [child.id, child])
+        ).values(),
+      ]
+    : childArtifacts;
 
   const albums = childArtifacts.filter(
-    (child) => getArtifactType(child) === "Album"
+    (child) => ["Album", "Single"].includes(getArtifactType(child))
   );
+  const bandReleases = isBandPage
+    ? [...artifactMap.values()]
+        .filter(
+          (candidate) =>
+            candidate.id !== currentArtifact.id &&
+            ["Album", "Single"].includes(getArtifactType(candidate)) &&
+            (candidate.band_id === currentArtifact.id ||
+              candidate.parent_id === currentArtifact.id ||
+              candidate.parent_slug === currentArtifact.slug)
+        )
+        .sort((a, b) => {
+          const yearDifference = releaseYear(b) - releaseYear(a);
+          if (yearDifference) return yearDifference;
 
-  const artwork = childArtifacts.filter((child) =>
+          const sortDifference = (b.sort_order ?? 0) - (a.sort_order ?? 0);
+          return sortDifference || a.title.localeCompare(b.title);
+        })
+    : [];
+  const isPresentedAsSingle = (release: Artifact) =>
+    getArtifactType(release) === "Single" ||
+    [...artifactMap.values()].filter(
+      (candidate) =>
+        getArtifactType(candidate) === "Song" &&
+        (candidate.album_id === release.id || candidate.parent_id === release.id)
+    ).length === 1;
+  const bandAlbums = bandReleases.filter(
+    (release) => !isPresentedAsSingle(release)
+  );
+  const bandSingles = bandReleases.filter(isPresentedAsSingle);
+
+  const artwork = presentationChildArtifacts.filter((child) =>
     ["Artwork", "Design", "Photo"].includes(getArtifactType(child))
   );
 
-  const videos = childArtifacts.filter(
+  const videos = presentationChildArtifacts.filter(
     (child) =>
       getArtifactType(child) === "Video" || child.video_url || child.youtube_url
   );
@@ -919,33 +1417,33 @@ export default async function ArtifactPage({
       ? [currentArtifact, ...videos]
       : videos;
 
-  const demos = childArtifacts.filter(
+  const demos = presentationChildArtifacts.filter(
     (child) => getArtifactType(child) === "Demo"
   );
 
-  const documents = childArtifacts.filter((child) =>
+  const documents = presentationChildArtifacts.filter((child) =>
     ["Document", "Text"].includes(getArtifactType(child))
   );
 
-  const audioChildren = childArtifacts.filter(
+  const audioChildren = presentationChildArtifacts.filter(
     (child) =>
       child.audio_url &&
       getArtifactType(child) !== "Song" &&
       getArtifactType(child) !== "Demo"
   );
 
-  const miscellaneousChildren = childArtifacts.filter((child) => {
+  const miscellaneousChildren = presentationChildArtifacts.filter((child) => {
     const type = getArtifactType(child);
 
     return (
-      !["Album", "Song", "Artwork", "Design", "Photo", "Video", "Demo", "Document", "Text"].includes(type) &&
+      !["Album", "Single", "Song", "Artwork", "Design", "Photo", "Video", "Demo", "Document", "Text"].includes(type) &&
       !child.audio_url &&
       !child.video_url &&
       !child.youtube_url
     );
   });
   const albumArtifact =
-    getArtifactType(currentArtifact) === "Album"
+    ["Album", "Single"].includes(getArtifactType(currentArtifact))
       ? currentArtifact
       : currentArtifact.album_id
         ? artifactMap.get(currentArtifact.album_id)
@@ -1004,6 +1502,7 @@ export default async function ArtifactPage({
       slug: track.slug,
       title: track.title,
       audioUrl: track.audio_url || undefined,
+      spotifyUrl: track.spotify_url || undefined,
       lyrics: track.lyrics || undefined,
       demos: trackDemos.map((demo) => ({
         id: demo.id,
@@ -1030,6 +1529,19 @@ export default async function ArtifactPage({
   });
   const coverImageUrl =
     currentArtifact.image_url || albumArtifact?.image_url || null;
+  const primaryAudioUrl =
+    isAlbumPage && !isSingleRelease
+      ? null
+      : currentArtifact.audio_url || legacySingleTrack?.audio_url || null;
+  const primarySpotifyUrl =
+    currentArtifact.spotify_url ||
+    (isSingleRelease ? legacySingleTrack?.spotify_url : null) ||
+    null;
+  const primaryLyrics =
+    isAlbumPage && !isSingleRelease
+      ? null
+      : currentArtifact.lyrics || legacySingleTrack?.lyrics || null;
+  const presentationType = isSingleRelease ? "Single" : currentArtifactType;
   const archiveFloatImages = artwork
     .filter((item) => item.image_url)
     .map((item) => ({ src: item.image_url || "", alt: item.title }));
@@ -1038,10 +1550,12 @@ export default async function ArtifactPage({
     .map((candidate) => ({
       ...candidate,
       score: scoreNearby(currentArtifact, candidate),
+      shared: sharedThreads(currentArtifact, candidate),
     }))
     .filter(
       (candidate) =>
         candidate.score > 0 &&
+        ["Band", "Album", "Single", "Song"].includes(getArtifactType(candidate)) &&
         candidate.parent_id !== currentArtifact.id &&
         candidate.parent_slug !== currentArtifact.slug
     )
@@ -1051,6 +1565,7 @@ export default async function ArtifactPage({
   const { data: driftArtifact } = await supabase
     .from("artifacts")
     .select("slug")
+    .eq("is_public", true)
     .neq("slug", currentArtifact.slug)
     .limit(1)
     .maybeSingle();
@@ -1072,15 +1587,35 @@ export default async function ArtifactPage({
   }
 
   if (view === "scrapbook") {
+    if (isBandPage) {
+      return (
+        <BandScrapbook
+          artifact={currentArtifact}
+          breadcrumbs={breadcrumbs}
+          albums={bandAlbums}
+          singles={bandSingles}
+          nearby={nearbyArtifacts}
+          canEdit={canEdit}
+        />
+      );
+    }
+
     return (
       <VisualScrapbook
         artifact={currentArtifact}
+        presentationType={presentationType}
+        primaryAudioUrl={primaryAudioUrl}
+        primarySpotifyUrl={primarySpotifyUrl}
+        primaryLyrics={primaryLyrics}
+        isAlbumPage={isAlbumPage}
+        isSingleRelease={isSingleRelease}
         coverImageUrl={coverImageUrl}
         albumTrackPreviews={albumTrackPreviews}
         breadcrumbs={breadcrumbs}
         artwork={artwork}
         videos={publishedVideos}
         demos={demos}
+        audioChildren={audioChildren}
         documents={documents}
         miscellaneous={miscellaneousChildren}
         nearby={nearbyArtifacts}
@@ -1094,33 +1629,26 @@ export default async function ArtifactPage({
       <div className="mx-auto max-w-5xl">
         <div className="flex flex-wrap items-center justify-between gap-5">
           <Breadcrumbs crumbs={breadcrumbs} />
-          {canEdit && <AddChildArtifactLink artifact={currentArtifact} />}
+          {canEdit && <ArchiveTools artifact={currentArtifact} />}
         </div>
 
         <article className="mt-14 grid gap-12 md:grid-cols-[0.85fr_1.15fr] md:items-start">
           <aside>
-            {currentArtifact.image_url ? (
-              <div className="overflow-hidden border border-stone-800 bg-stone-950">
-                <ArtifactImageButton
-                  src={currentArtifact.image_url}
-                  alt={currentArtifact.title}
-                  alwaysColor
-                  className="block w-full"
-                  imageClassName="h-auto w-full object-cover opacity-90"
-                />
-              </div>
-            ) : (
-              <div className="flex aspect-[4/5] items-center justify-center border border-dashed border-stone-800 bg-stone-950/50 text-center">
-                <p className="max-w-xs px-8 text-sm italic leading-relaxed text-stone-600">
-                  Something is here, but it has not fully appeared.
-                </p>
-              </div>
-            )}
+            {(currentArtifact.image_url || canEdit) && <div className="overflow-hidden border border-stone-800 bg-stone-950">
+              <ArchiveHeroImageDrop
+                artifactId={currentArtifact.id}
+                alt={currentArtifact.title}
+                canEdit={canEdit}
+                imageUrl={currentArtifact.image_url}
+                label="Primary image"
+                imageClassName="h-auto w-full object-cover opacity-90"
+              />
+            </div>}
 
             {currentArtifact.youtube_url && (
               <div className="mt-6 aspect-video w-full border border-stone-800 bg-black">
                 <iframe
-                  src={getYouTubeEmbedUrl(currentArtifact.youtube_url)}
+                  src={getVideoEmbedUrl(currentArtifact.youtube_url)}
                   title={currentArtifact.title}
                   className="h-full w-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -1134,6 +1662,14 @@ export default async function ArtifactPage({
                 controls
                 src={currentArtifact.video_url}
                 className="mt-6 w-full border border-stone-800 opacity-90"
+              />
+            )}
+
+            {currentArtifact.spotify_url && (
+              <SpotifyTrackEmbed
+                title={currentArtifact.title}
+                url={currentArtifact.spotify_url}
+                className="mt-6"
               />
             )}
 
@@ -1151,7 +1687,7 @@ export default async function ArtifactPage({
                     {child.youtube_url ? (
                       <div className="aspect-video w-full border border-stone-800 bg-black">
                         <iframe
-                          src={getYouTubeEmbedUrl(child.youtube_url)}
+                          src={getVideoEmbedUrl(child.youtube_url)}
                           title={child.title}
                           className="h-full w-full"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -1193,7 +1729,10 @@ export default async function ArtifactPage({
               {currentArtifact.title}
             </h1>
             <div className="mt-6">
-              <ArtifactImageExperience images={archiveFloatImages} />
+              <ArtifactImageExperience
+                images={archiveFloatImages}
+                spotifyUrl={currentArtifact.spotify_url}
+              />
             </div>
 
             {currentArtifact.audio_url && (

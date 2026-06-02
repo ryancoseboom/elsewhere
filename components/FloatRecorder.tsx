@@ -54,6 +54,8 @@ type ImageLayer = {
 const recordingDuration = 30_000;
 const gridColumns = 12;
 const gridRows = 8;
+const recordingImageLimit = 20;
+const recordingTextureLimit = 7;
 
 function seededUnit(seed: number) {
   const value = Math.sin(seed * 9187.17) * 10000;
@@ -341,17 +343,19 @@ export default function FloatRecorder({
     canvas.height = height;
 
     Promise.all([
-      Promise.all(images.map((image) => loadImage(image.src))),
-      Promise.all(textures.map((texture) => loadImage(texture))),
+      Promise.all(
+        images.slice(0, recordingImageLimit).map((image) => loadImage(image.src))
+      ),
+      Promise.all(textures.slice(0, recordingTextureLimit).map(loadImage)),
     ]).then(([loadedImages, loadedTextures]) => {
       if (stopped) return;
 
       const availableImages = loadedImages.filter(
         (image): image is HTMLImageElement => Boolean(image)
-      );
+      ).slice(0, recordingImageLimit);
       const availableTextures = loadedTextures.filter(
         (image): image is HTMLImageElement => Boolean(image)
-      );
+      ).slice(0, recordingTextureLimit);
 
       if (availableImages.length === 0) {
         onError("FLOAT could not load any images for recording.");
@@ -360,7 +364,7 @@ export default function FloatRecorder({
 
       const maskedTextures = availableTextures.map(makeMaskedTexture);
       const tiles = packTiles(seed, availableImages.length, maskedTextures.length);
-      const layers = Array.from({ length: 12 }, (_, index): TextureLayer => {
+      const layers = Array.from({ length: 9 }, (_, index): TextureLayer => {
         const layerSeed = seed + index * 31 + 701;
 
         return {
@@ -372,7 +376,7 @@ export default function FloatRecorder({
           textureOffset: Math.floor(seededUnit(layerSeed + 6) * maskedTextures.length),
         };
       });
-      const imageLayers = Array.from({ length: 4 }, (_, index): ImageLayer => {
+      const imageLayers = Array.from({ length: 3 }, (_, index): ImageLayer => {
         const layerSeed = seed + index * 47 + 1701;
 
         return {
@@ -384,11 +388,7 @@ export default function FloatRecorder({
           rowSpan: Math.floor(seededRange(layerSeed + 6, 4, 10)),
         };
       });
-      const maskedImageLayers = imageLayers.map((layer) =>
-        availableImages.map((image) =>
-          makeMaskedImage(image, layer.columnSpan / layer.rowSpan)
-        )
-      );
+      const maskedImages = availableImages.map((image) => makeMaskedImage(image, 1.25));
       const startedAt = performance.now();
       const gap = Math.max(8, Math.round(Math.min(width, height) * 0.008));
       const cellWidth = width / gridColumns;
@@ -457,8 +457,7 @@ export default function FloatRecorder({
         drawingContext.globalCompositeOperation = "screen";
         imageLayers.forEach((layer, index) => {
           const frame = layerFrame(seconds, layer.phase, 7.35, 1.45);
-          const layerImages = maskedImageLayers[index];
-          const image = layerImages[(layer.imageOffset + frame.cycle) % layerImages.length];
+          const image = maskedImages[(layer.imageOffset + frame.cycle) % maskedImages.length];
           const x = layer.column * cellWidth;
           const y = layer.row * cellHeight;
           const layerWidth = layer.columnSpan * cellWidth;

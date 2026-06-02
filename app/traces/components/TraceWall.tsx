@@ -13,12 +13,12 @@ export default function TraceWall() {
 
       <div
   className="absolute inset-0 opacity-[0.22] mix-blend-screen"
-  style={{ backgroundImage: "url('/textures/photocopy-noise.png')" }}
+  style={{ backgroundImage: "url('/textures/float/photocopy-noise.jpg')" }}
 />
 
 <div
   className="absolute inset-0 opacity-[0.18] mix-blend-screen"
-  style={{ backgroundImage: "url('/textures/dust-scratches.png')" }}
+  style={{ backgroundImage: "url('/textures/float/dust-scratches.jpg')" }}
 />
 
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_28%,rgba(0,0,0,.9)_100%)]" />

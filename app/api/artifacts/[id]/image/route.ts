@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { EPHEMERA_PANES, type EphemeraPane } from "@/lib/ephemera";
 
 function hasValidBackroomAuthorization(value: string | null) {
   if (!value?.startsWith("Basic ")) return false;
@@ -27,6 +28,8 @@ function isImageArtifact(type: string | null | undefined) {
   return ["Artwork", "Design", "Photo"].includes(type || "");
 }
 
+const ephemeraPrefix = "ephemera:";
+
 function getArchiveStoragePath(imageUrl: string) {
   const marker = "/storage/v1/object/public/artifact-media/";
 
@@ -50,18 +53,28 @@ export async function PATCH(
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { title } = (await request.json()) as { title?: string };
+  const { title, ephemeraPane } = (await request.json()) as {
+    title?: string;
+    ephemeraPane?: string;
+  };
   const nextTitle = title?.trim();
 
-  if (!nextTitle) {
-    return Response.json({ error: "Image name is required." }, { status: 400 });
+  if (!nextTitle && !ephemeraPane) {
+    return Response.json({ error: "Nothing to update." }, { status: 400 });
+  }
+
+  if (
+    ephemeraPane &&
+    !EPHEMERA_PANES.includes(ephemeraPane as EphemeraPane)
+  ) {
+    return Response.json({ error: "Unknown Ephemera pane." }, { status: 400 });
   }
 
   const { id } = await params;
   const supabase = await createClient();
   const { data: artifact, error: artifactError } = await supabase
     .from("artifacts")
-    .select("id, artifact_type, kind")
+    .select("id, artifact_type, kind, rooms")
     .eq("id", id)
     .single();
 
@@ -76,16 +89,27 @@ export async function PATCH(
     );
   }
 
+  const rooms = ephemeraPane
+    ? [
+        ...(artifact.rooms || []).filter(
+          (room: string) => !room.startsWith(ephemeraPrefix)
+        ),
+        `${ephemeraPrefix}${ephemeraPane}`,
+      ]
+    : artifact.rooms;
   const { error: updateError } = await supabase
     .from("artifacts")
-    .update({ title: nextTitle })
+    .update({
+      ...(nextTitle ? { title: nextTitle } : {}),
+      ...(ephemeraPane ? { rooms } : {}),
+    })
     .eq("id", artifact.id);
 
   if (updateError) {
     return Response.json({ error: updateError.message }, { status: 500 });
   }
 
-  return Response.json({ title: nextTitle });
+  return Response.json({ title: nextTitle, ephemeraPane });
 }
 
 export async function DELETE(

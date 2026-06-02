@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import crypto from "crypto";
 import TitleSlugFields from "@/components/TitleSlugFields";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
+import { spotifyUrl } from "@/lib/spotify";
 
 type ArtifactOption = {
   id: string;
@@ -15,6 +16,7 @@ type ArtifactOption = {
 const ARTIFACT_TYPES = [
   "Band",
   "Album",
+  "Single",
   "Song",
   "Artwork",
   "Video",
@@ -161,6 +163,7 @@ async function createArtifact(formData: FormData) {
       ? await uploadArtifactFile({ file: videoFile, folder: "video", slug })
       : "";
 
+  const spotify_url = spotifyUrl(String(formData.get("spotify_url") || ""));
   const { error } = await supabase.from("artifacts").insert({
     title,
     slug,
@@ -195,6 +198,7 @@ async function createArtifact(formData: FormData) {
     audio_url,
     video_url,
     youtube_url: String(formData.get("youtube_url") || "").trim(),
+    ...(spotify_url ? { spotify_url } : {}),
     private_notes: String(formData.get("private_notes") || "").trim(),
     is_public: formData.get("is_public") === "yes",
   });
@@ -313,9 +317,9 @@ export default async function NewArtifactPage({
                 Hierarchy
               </p>
               <p className="mt-2 text-sm leading-relaxed text-stone-600">
-                Bands contain albums. Albums contain songs. Songs and albums can
-                also have child artifacts like artwork, videos, demos, designs,
-                and documents.
+                Bands contain albums and singles. Albums contain songs. Songs,
+                singles, and albums can also have child artifacts like artwork,
+                videos, demos, designs, and documents.
               </p>
             </div>
 
@@ -350,7 +354,7 @@ export default async function NewArtifactPage({
               name="parent_id"
               label="Parent Artifact"
               artifacts={artifacts}
-              help="The direct parent. For an album this is usually the band. For a song this is usually the album. For artwork/video/demo this is usually the song or album."
+              help="The direct parent. For an album or single this is usually the band. For a song this is usually the album. For artwork/video/demo this is usually the song, single, or album."
               currentValue={parentId}
             />
 
@@ -519,12 +523,23 @@ export default async function NewArtifactPage({
 
             <div>
               <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
-                YouTube Link
+                YouTube or Vimeo Link
               </label>
               <input
                 name="youtube_url"
                 className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
-                placeholder="https://www.youtube.com/watch?v=..."
+                placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+                Spotify Link
+              </label>
+              <input
+                name="spotify_url"
+                className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
+                placeholder="https://open.spotify.com/album/... or /track/..."
               />
             </div>
           </section>
