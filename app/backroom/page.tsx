@@ -181,6 +181,13 @@ const orphanArtifacts = items.filter(
           >
             Archive intake
           </Link>
+
+          <Link
+            href="/backroom/media-labels"
+            className="inline-flex w-fit rounded-full border border-stone-600 px-6 py-3 text-xs uppercase tracking-[0.25em] text-stone-200 hover:bg-stone-200 hover:text-neutral-950 transition"
+          >
+            Rewrite media labels
+          </Link>
         </header>
 
         {items.length > 0 ? (

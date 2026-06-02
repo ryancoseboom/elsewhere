@@ -35,8 +35,8 @@ projects.
 1. Apply the SQL migrations in `supabase/migrations/` to the production project.
 2. Confirm the `artifact-media` storage bucket is public so published images,
    audio, and video can load for visitors.
-3. Set every live artifact to public in the Backroom. Attached media follows the
-   parent artifact publication state.
+3. Set every live release to public in the Backroom. Tracks and attached media
+   follow the release publication state.
 4. Add album or track Spotify links in each release editor.
 5. Run `npm run build` with the production environment variables before launch.
 6. Visit `/`, `/explore`, `/drift`, `/float`, `/robots.txt`, and `/sitemap.xml`

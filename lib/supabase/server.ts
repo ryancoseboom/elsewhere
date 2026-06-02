@@ -1,6 +1,19 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+export function requireSupabaseWriteKey() {
+  const writeKey =
+    process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!writeKey) {
+    throw new Error(
+      "Backroom writes require SUPABASE_SECRET_KEY. Add the server-only Supabase secret key to the environment."
+    );
+  }
+
+  return writeKey;
+}
+
 export async function createClient() {
   const cookieStore = await cookies();
 

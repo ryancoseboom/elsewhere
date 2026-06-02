@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArtifactImageButton } from "@/components/ArtifactImageExperience";
+import { archiveTexture } from "@/lib/archive-textures";
 
 type ArchiveHeroImageDropProps = {
   artifactId: string;
@@ -26,6 +27,7 @@ export default function ArchiveHeroImageDrop({
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const texture = archiveTexture(`${artifactId}:hero:${label}`);
 
   async function upload(file?: File) {
     if (!file || !file.type.startsWith("image/")) {
@@ -67,6 +69,7 @@ export default function ArchiveHeroImageDrop({
         alwaysColor
         className="block w-full"
         imageClassName={imageClassName}
+        loading="eager"
       />
     ) : null;
   }
@@ -112,8 +115,7 @@ export default function ArchiveHeroImageDrop({
         <div
           className="absolute inset-0 opacity-70"
           style={{
-            backgroundImage:
-              "linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(/textures/float/photocopy-noise.jpg)",
+            backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(${texture})`,
             backgroundSize: "cover",
           }}
         />

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { archiveTexture } from "@/lib/archive-textures";
 
 type ArchiveImageDropProps = {
   artifactId: string;
@@ -19,11 +20,7 @@ export default function ArchiveImageDrop({
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const textures = [
-    "/textures/float/photocopy-noise.jpg",
-    "/textures/float/fingerprint-smudge.jpg",
-    "/textures/float/dust-scratches.jpg",
-  ];
+  const texture = archiveTexture(`${artifactId}:image:${index}`);
 
   async function upload(file?: File) {
     if (!file || !file.type.startsWith("image/")) {
@@ -63,7 +60,7 @@ export default function ArchiveImageDrop({
         dragging ? "border-stone-300" : "border-stone-800"
       } ${className}`}
       style={{
-        backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.35), rgba(12,10,9,0.88)), url(${textures[index % textures.length]})`,
+        backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.35), rgba(12,10,9,0.88)), url(${texture})`,
         backgroundSize: "cover",
       }}
       onClick={() => inputRef.current?.click()}

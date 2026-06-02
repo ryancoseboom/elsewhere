@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent,
+  type TouchEvent,
 } from "react";
 import FloatRecorder, { type FloatRecording } from "./FloatRecorder";
 import { spotifyUrl as normalizeSpotifyUrl } from "@/lib/spotify";
@@ -15,12 +16,14 @@ import { spotifyUrl as normalizeSpotifyUrl } from "@/lib/spotify";
 type ExperienceImage = {
   src: string;
   alt: string;
+  category?: string;
 };
 
 type ArtifactImageButtonProps = ExperienceImage & {
   alwaysColor?: boolean;
   className?: string;
   imageClassName?: string;
+  loading?: "eager" | "lazy";
 };
 
 type RecordingDimensions = {
@@ -127,9 +130,11 @@ function organicClipPath(seed: number) {
 export function ArtifactImageButton({
   src,
   alt,
+  category,
   alwaysColor = false,
   className = "",
   imageClassName = "",
+  loading = "lazy",
 }: ArtifactImageButtonProps) {
   const positioningClass = className.includes("absolute") ? "" : "relative";
 
@@ -141,7 +146,7 @@ export function ArtifactImageButton({
       onClick={() => {
         window.dispatchEvent(
           new CustomEvent<ExperienceImage>(openImageEvent, {
-            detail: { src, alt },
+            detail: { src, alt, category },
           })
         );
       }}
@@ -150,6 +155,7 @@ export function ArtifactImageButton({
       <img
         src={src}
         alt={alt}
+        loading={loading}
         style={
           alwaysColor
             ? undefined
@@ -493,7 +499,41 @@ export default function ArtifactImageExperience({
   );
   const [recordingName, setRecordingName] = useState("elsewhere-float");
   const [pageHidden, setPageHidden] = useState(false);
+  const lightboxOpen = Boolean(lightboxImage);
   const floatRef = useRef<HTMLDivElement>(null);
+  const closeLightboxRef = useRef<HTMLButtonElement>(null);
+  const lightboxRef = useRef<HTMLDivElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
+  const lightboxImages = useMemo(() => {
+    const uniqueImages = new Map(images.map((image) => [image.src, image]));
+
+    if (lightboxImage && !uniqueImages.has(lightboxImage.src)) {
+      return [lightboxImage, ...uniqueImages.values()];
+    }
+
+    return [...uniqueImages.values()];
+  }, [images, lightboxImage]);
+
+  const moveLightbox = useCallback(
+    (offset: number) => {
+      if (!lightboxImage || lightboxImages.length < 2) return;
+
+      const currentIndex = lightboxImages.findIndex(
+        (image) => image.src === lightboxImage.src
+      );
+      if (currentIndex < 0) return;
+
+      const nextIndex =
+        (currentIndex + offset + lightboxImages.length) % lightboxImages.length;
+      setLightboxImage(lightboxImages[nextIndex]);
+    },
+    [lightboxImage, lightboxImages]
+  );
+  const closeLightbox = useCallback(() => {
+    setLightboxImage(null);
+    window.setTimeout(() => previousActiveElementRef.current?.focus(), 0);
+  }, []);
 
   const launchFloat = useCallback(() => {
     setFloatSeed(Math.floor(Math.random() * 1_000_000));
@@ -557,13 +597,48 @@ export default function ArtifactImageExperience({
 
   useEffect(() => {
     function openImage(event: Event) {
+      previousActiveElementRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
       setLightboxImage((event as CustomEvent<ExperienceImage>).detail);
     }
 
     function closeOnEscape(event: KeyboardEvent) {
+      if (lightboxImage && event.key === "Tab") {
+        const focusableElements = lightboxRef.current?.querySelectorAll<
+          HTMLAnchorElement | HTMLButtonElement
+        >("a[href], button:not([disabled])");
+        if (!focusableElements?.length) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey && document.activeElement === firstElement) {
+          event.preventDefault();
+          lastElement.focus();
+        } else if (!event.shiftKey && document.activeElement === lastElement) {
+          event.preventDefault();
+          firstElement.focus();
+        }
+        return;
+      }
+
+      if (lightboxImage && event.key === "ArrowLeft") {
+        event.preventDefault();
+        moveLightbox(-1);
+        return;
+      }
+
+      if (lightboxImage && event.key === "ArrowRight") {
+        event.preventDefault();
+        moveLightbox(1);
+        return;
+      }
+
       if (event.key !== "Escape") return;
 
-      setLightboxImage(null);
+      closeLightbox();
       setFloating(false);
     }
 
@@ -574,7 +649,12 @@ export default function ArtifactImageExperience({
       window.removeEventListener(openImageEvent, openImage);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, []);
+  }, [closeLightbox, lightboxImage, moveLightbox]);
+
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    closeLightboxRef.current?.focus();
+  }, [lightboxOpen]);
 
   useEffect(() => {
     if (!floating && !lightboxImage) return;
@@ -841,17 +921,60 @@ export default function ArtifactImageExperience({
 
       {lightboxImage && (
         <div
-          role="presentation"
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 p-5 backdrop-blur-sm md:p-12"
-          onClick={() => setLightboxImage(null)}
+          ref={lightboxRef}
+          role="dialog"
+          aria-label="Image viewer"
+          aria-modal="true"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 px-5 pb-32 pt-16 backdrop-blur-sm md:px-16 md:pb-44 md:pt-20"
+          onClick={closeLightbox}
+          onTouchStart={(event: TouchEvent<HTMLDivElement>) => {
+            touchStartXRef.current = event.touches[0]?.clientX ?? null;
+          }}
+          onTouchEnd={(event: TouchEvent<HTMLDivElement>) => {
+            const touchStartX = touchStartXRef.current;
+            const touchEndX = event.changedTouches[0]?.clientX;
+            touchStartXRef.current = null;
+
+            if (touchStartX === null || touchEndX === undefined) return;
+            if (Math.abs(touchEndX - touchStartX) < 48) return;
+
+            moveLightbox(touchEndX > touchStartX ? -1 : 1);
+          }}
         >
           <button
+            ref={closeLightboxRef}
             type="button"
             className="absolute right-5 top-5 border border-stone-700 bg-black/70 px-3 py-2 text-xs uppercase tracking-[0.25em] text-stone-300 transition hover:border-stone-400 hover:text-white"
-            onClick={() => setLightboxImage(null)}
+            onClick={closeLightbox}
           >
             Close
           </button>
+          {lightboxImages.length > 1 && (
+            <>
+              <button
+                type="button"
+                aria-label="Previous image"
+                className="absolute left-4 top-1/2 z-10 -translate-y-1/2 border border-stone-700 bg-black/70 px-4 py-3 text-2xl text-stone-300 transition hover:border-stone-400 hover:text-white md:left-7"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  moveLightbox(-1);
+                }}
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                aria-label="Next image"
+                className="absolute right-4 top-1/2 z-10 -translate-y-1/2 border border-stone-700 bg-black/70 px-4 py-3 text-2xl text-stone-300 transition hover:border-stone-400 hover:text-white md:right-7"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  moveLightbox(1);
+                }}
+              >
+                →
+              </button>
+            </>
+          )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={lightboxImage.src}
@@ -859,6 +982,67 @@ export default function ArtifactImageExperience({
             className="max-h-full max-w-full object-contain"
             onClick={(event) => event.stopPropagation()}
           />
+          <div
+            className="absolute inset-x-5 bottom-5 md:inset-x-16"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {lightboxImages.length > 1 && (
+              <div className="mb-4 hidden max-w-full gap-2 overflow-x-auto pb-1 md:flex">
+                {lightboxImages.map((image, index) => (
+                  <button
+                    key={`${image.src}-${index}`}
+                    type="button"
+                    aria-label={`Open image ${index + 1} of ${lightboxImages.length}`}
+                    aria-current={image.src === lightboxImage.src ? "true" : undefined}
+                    className={`h-14 w-14 shrink-0 overflow-hidden border bg-stone-950 transition ${
+                      image.src === lightboxImage.src
+                        ? "border-stone-200 opacity-100"
+                        : "border-stone-700 opacity-55 hover:border-stone-400 hover:opacity-100"
+                    }`}
+                    onClick={() => setLightboxImage(image)}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={image.src}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap items-end justify-between gap-3 border-t border-stone-800 pt-3">
+              <div>
+                {lightboxImage.category && (
+                  <p className="text-[9px] uppercase tracking-[0.22em] text-stone-600">
+                    {lightboxImage.category}
+                  </p>
+                )}
+                <p className="mt-1 max-w-3xl font-serif text-sm text-stone-300">
+                  {lightboxImage.alt}
+                </p>
+              </div>
+              <div className="flex items-center gap-4 text-[9px] uppercase tracking-[0.2em] text-stone-500">
+                <span>
+                  {Math.max(
+                    1,
+                    lightboxImages.findIndex(
+                      (image) => image.src === lightboxImage.src
+                    ) + 1
+                  )}{" "}
+                  / {lightboxImages.length}
+                </span>
+                <a
+                  href={lightboxImage.src}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="transition hover:text-white"
+                >
+                  View original ↗
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

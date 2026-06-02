@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import {
+  createClient,
+  requireSupabaseWriteKey,
+} from "@/lib/supabase/server";
 import crypto from "crypto";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
-import { syncAttachedMediaPublication } from "@/lib/artifact-publication";
+import { syncArtifactDescendantPublication } from "@/lib/artifact-publication";
 import { spotifyUrl } from "@/lib/spotify";
 
 type Artifact = {
@@ -106,6 +109,7 @@ async function uploadArtifactFile({
   folder: "images" | "audio" | "video";
   slug: string;
 }) {
+  requireSupabaseWriteKey();
   const supabase = await createClient();
 
   if (!file || file.size === 0) return "";
@@ -132,6 +136,7 @@ async function uploadArtifactFile({
 async function updateArtifact(formData: FormData) {
   "use server";
 
+  requireSupabaseWriteKey();
   const supabase = await createClient();
 
   const id = String(formData.get("id") || "");
@@ -188,7 +193,7 @@ async function updateArtifact(formData: FormData) {
     formData.get("existing_spotify_url") || ""
   ).trim();
   const isPublic = formData.get("is_public") === "yes";
-  const { error } = await supabase
+  const { data: updatedArtifact, error } = await supabase
     .from("artifacts")
     .update({
       title,
@@ -225,20 +230,28 @@ async function updateArtifact(formData: FormData) {
       era: String(formData.get("era") || "").trim(),
       is_public: isPublic,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .single();
 
-  if (error) throw new Error(error.message);
-
-  if (spotify_url !== existingSpotifyUrl) {
-    const { error: spotifyError } = await supabase
-      .from("artifacts")
-      .update({ spotify_url })
-      .eq("id", id);
-
-    if (spotifyError) throw new Error(spotifyError.message);
+  if (error || !updatedArtifact) {
+    throw new Error(error?.message || "Artifact update did not save.");
   }
 
-  await syncAttachedMediaPublication({
+  if (spotify_url !== existingSpotifyUrl) {
+    const { data: spotifyArtifact, error: spotifyError } = await supabase
+      .from("artifacts")
+      .update({ spotify_url })
+      .eq("id", id)
+      .select("id")
+      .single();
+
+    if (spotifyError || !spotifyArtifact) {
+      throw new Error(spotifyError?.message || "Spotify link did not save.");
+    }
+  }
+
+  await syncArtifactDescendantPublication({
     artifactId: id,
     artifactSlug: slug,
     isPublic,
@@ -250,14 +263,22 @@ async function updateArtifact(formData: FormData) {
 async function deleteArtifact(formData: FormData) {
   "use server";
 
+  requireSupabaseWriteKey();
   const supabase = await createClient();
   const id = String(formData.get("id") || "");
 
   if (!id) throw new Error("Missing artifact id.");
 
-  const { error } = await supabase.from("artifacts").delete().eq("id", id);
+  const { data: deletedArtifact, error } = await supabase
+    .from("artifacts")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .single();
 
-  if (error) throw new Error(error.message);
+  if (error || !deletedArtifact) {
+    throw new Error(error?.message || "Artifact deletion did not save.");
+  }
 
   redirect("/backroom");
 }

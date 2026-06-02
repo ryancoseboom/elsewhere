@@ -2,6 +2,7 @@
 
 import { type FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { archiveTexture } from "@/lib/archive-textures";
 
 export default function ArchiveVideoDrop({ artifactId }: { artifactId: string }) {
   const router = useRouter();
@@ -10,6 +11,7 @@ export default function ArchiveVideoDrop({ artifactId }: { artifactId: string })
   const [uploading, setUploading] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
   const [error, setError] = useState("");
+  const texture = archiveTexture(`${artifactId}:video`);
 
   async function addVideo(formData: FormData) {
     setDragging(false);
@@ -64,8 +66,7 @@ export default function ArchiveVideoDrop({ artifactId }: { artifactId: string })
         dragging ? "border-stone-300" : "border-stone-800"
       }`}
       style={{
-        backgroundImage:
-          "linear-gradient(135deg, rgba(12,10,9,0.42), rgba(12,10,9,0.9)), url(/textures/float/dust-scratches.jpg)",
+        backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.42), rgba(12,10,9,0.9)), url(${texture})`,
         backgroundSize: "cover",
       }}
       onClick={() => inputRef.current?.click()}

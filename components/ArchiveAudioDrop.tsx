@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { archiveTexture } from "@/lib/archive-textures";
 
 export default function ArchiveAudioDrop({ artifactId }: { artifactId: string }) {
   const router = useRouter();
@@ -9,6 +10,7 @@ export default function ArchiveAudioDrop({ artifactId }: { artifactId: string })
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const texture = archiveTexture(`${artifactId}:audio`);
 
   async function upload(file?: File) {
     if (!file || !file.type.startsWith("audio/")) {
@@ -48,8 +50,7 @@ export default function ArchiveAudioDrop({ artifactId }: { artifactId: string })
         dragging ? "border-stone-300" : "border-stone-800"
       }`}
       style={{
-        backgroundImage:
-          "linear-gradient(135deg, rgba(12,10,9,0.42), rgba(12,10,9,0.9)), url(/textures/float/fingerprint-smudge.jpg)",
+        backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.42), rgba(12,10,9,0.9)), url(${texture})`,
         backgroundSize: "cover",
       }}
       onClick={() => inputRef.current?.click()}

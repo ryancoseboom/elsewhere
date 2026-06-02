@@ -1,3 +1,5 @@
+import { ARCHIVE_MAP_COLORS } from "@/lib/archive-map-colors";
+
 type ArchiveBranchProps = {
   className?: string;
   color?: string;
@@ -5,7 +7,7 @@ type ArchiveBranchProps = {
 
 export default function ArchiveBranch({
   className = "",
-  color = "#7c8f72",
+  color = ARCHIVE_MAP_COLORS.album,
 }: ArchiveBranchProps) {
   return (
     <svg

@@ -4,10 +4,13 @@ import ArchiveBranch from "@/components/ArchiveBranch";
 import { createClient } from "@/lib/supabase/server";
 import {
   artifactType,
-  sharedThreads,
   shuffle,
   type ArchiveArtifact,
 } from "@/lib/archive-navigation";
+import {
+  ARCHIVE_MAP_COLORS,
+  DRIFT_DIRECTION_COLORS,
+} from "@/lib/archive-map-colors";
 import { getYouTubeThumbnailUrl } from "@/lib/video";
 
 type DriftReading = {
@@ -19,6 +22,11 @@ type SignalPreview = {
   artifact: ArchiveArtifact;
   imageUrl: string;
   videoUrl: string;
+};
+
+type BackdropTile = {
+  imageUrl: string;
+  residue: boolean;
 };
 
 function driftReadings(
@@ -180,25 +188,6 @@ function signalPreview(artifact: ArchiveArtifact): SignalPreview | null {
   return { artifact, imageUrl, videoUrl };
 }
 
-function chooseSignalPreviews(groups: ArchiveArtifact[][]) {
-  const previews: SignalPreview[] = [];
-  const seenMedia = new Set<string>();
-
-  groups.forEach((group) => {
-    shuffle(group).forEach((artifact) => {
-      const preview = signalPreview(artifact);
-      const identity = preview?.imageUrl || preview?.videoUrl;
-
-      if (preview && identity && !seenMedia.has(identity)) {
-        previews.push(preview);
-        seenMedia.add(identity);
-      }
-    });
-  });
-
-  return previews.slice(0, 4);
-}
-
 function isAttachedTo(
   current: ArchiveArtifact,
   candidate: ArchiveArtifact
@@ -212,6 +201,50 @@ function isAttachedTo(
       (candidate.band_id === current.id &&
         ["Album", "Single"].includes(artifactType(candidate))))
   );
+}
+
+function representativePreview(
+  artifact: ArchiveArtifact,
+  artifacts: ArchiveArtifact[]
+) {
+  return (
+    signalPreview(artifact) ||
+    shuffle(artifacts.filter((candidate) => isAttachedTo(artifact, candidate)))
+      .map(signalPreview)
+      .find((preview): preview is SignalPreview => Boolean(preview)) ||
+    null
+  );
+}
+
+function uniqueBackdrop(
+  residueArtifacts: ArchiveArtifact[],
+  artifacts: ArchiveArtifact[]
+) {
+  const backdrop: BackdropTile[] = [];
+  const imageUrls = new Set<string>();
+
+  function add(imageUrl: string, residue: boolean) {
+    const normalizedUrl = imageUrl.trim();
+
+    if (!normalizedUrl || imageUrls.has(normalizedUrl)) return;
+
+    backdrop.push({ imageUrl: normalizedUrl, residue });
+    imageUrls.add(normalizedUrl);
+  }
+
+  shuffle(residueArtifacts).forEach((artifact) => {
+    const preview = representativePreview(artifact, artifacts);
+
+    if (preview?.imageUrl) add(preview.imageUrl, true);
+  });
+
+  shuffle(artifacts).forEach((artifact) => {
+    if (backdrop.length < 12 && artifact.image_url) {
+      add(artifact.image_url, false);
+    }
+  });
+
+  return backdrop.slice(0, 12);
 }
 
 export default async function DriftArtifactPage({
@@ -248,40 +281,60 @@ export default async function DriftArtifactPage({
   const trailArtifacts = nextTrail
     .map((trailSlug) => artifacts.find((artifact) => artifact.slug === trailSlug))
     .filter((artifact): artifact is ArchiveArtifact => Boolean(artifact));
+  const residueArtifacts = trailArtifacts.slice(0, -1);
+  const residueMotifs = [
+    ...new Set(
+      residueArtifacts.flatMap((artifact) =>
+        (artifact.motifs || []).map((motif) => motif.trim()).filter(Boolean)
+      )
+    ),
+  ];
+  const residueFragments = [
+    ...new Set(
+      residueArtifacts
+        .map((artifact) => artifact.fragment?.trim())
+        .filter((fragment): fragment is string => Boolean(fragment))
+    ),
+  ].slice(-2);
   const attachedArtifacts = artifacts.filter((artifact) =>
     isAttachedTo(current, artifact)
   );
-  const previewNeighbors = artifacts.filter(
-    (artifact) =>
-      artifact.id !== current.id && sharedThreads(current, artifact).length > 0
-  );
-  const visualPreviews = chooseSignalPreviews([
-    [current, ...attachedArtifacts],
-    candidates.map(({ artifact }) => artifact),
-    previewNeighbors,
-    artifacts,
-  ]);
+  const currentPreview = representativePreview(current, artifacts);
+  const directionPreviews = candidates
+    .map(({ artifact, reading }, index) => ({
+      artifact,
+      reading,
+      color: DRIFT_DIRECTION_COLORS[index],
+      number: index + 1,
+      preview: representativePreview(artifact, artifacts),
+    }))
+    .filter(
+      (direction): direction is typeof direction & { preview: SignalPreview } =>
+        Boolean(direction.preview)
+    );
   const audioPreviews = shuffle([current, ...attachedArtifacts])
     .filter((artifact) => artifact.audio_url?.trim())
     .slice(0, 2);
-  const backdrop = shuffle(
-    artifacts.filter((artifact) => artifact.image_url?.trim())
-  ).slice(0, 12);
+  const backdrop = uniqueBackdrop(residueArtifacts, artifacts);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#090807] px-6 py-8 text-stone-200">
       <div className="absolute inset-0 opacity-55">
         <div className="grid h-full grid-cols-4 grid-rows-3 gap-1 p-1 md:grid-cols-6">
-          {backdrop.map((artifact, index) => (
+          {backdrop.map(({ imageUrl, residue }) => (
             <div
-              key={`${artifact.slug}-${index}`}
-              className="relative overflow-hidden bg-stone-950"
+              key={imageUrl}
+              className={`relative overflow-hidden bg-stone-950 ${
+                residue ? "animate-pulse ring-1 ring-inset ring-stone-300/25 [animation-duration:7s]" : ""
+              }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={artifact.image_url || ""}
+                src={imageUrl}
                 alt=""
-                className="h-full w-full object-cover opacity-55"
+                className={`h-full w-full object-cover ${
+                  residue ? "opacity-75" : "opacity-55"
+                }`}
               />
             </div>
           ))}
@@ -324,24 +377,23 @@ export default async function DriftArtifactPage({
                 {current.description}
               </p>
             )}
-            {(visualPreviews.length > 0 || audioPreviews.length > 0) && (
+            {(currentPreview || directionPreviews.length > 0 || audioPreviews.length > 0) && (
               <div className="mt-9 max-w-2xl border-t border-stone-700/80 pt-5">
                 <p className="text-[9px] uppercase tracking-[0.34em] text-stone-500">
                   Signal previews
                 </p>
-                {visualPreviews.length > 0 && (
-                  <div className="mt-4 grid max-w-3xl grid-cols-2 gap-2">
-                    {visualPreviews.map((preview) => (
+                {(currentPreview || directionPreviews.length > 0) && (
+                  <div className="mt-4 max-w-3xl">
+                    {currentPreview && (
                       <Link
-                        key={preview.artifact.id}
-                        href={`/artifact/${preview.artifact.slug}`}
-                        className="group relative aspect-[4/3] overflow-hidden bg-black/70"
+                        href={`/artifact/${current.slug}`}
+                        className="group relative block aspect-[16/9] overflow-hidden border border-stone-500/70 bg-black/70"
                       >
-                        {preview.imageUrl ? (
+                        {currentPreview.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={preview.imageUrl}
-                            alt={preview.artifact.title}
+                            src={currentPreview.imageUrl}
+                            alt={currentPreview.artifact.title}
                             className="h-full w-full object-cover opacity-90 transition duration-700 group-hover:opacity-100"
                           />
                         ) : (
@@ -349,16 +401,61 @@ export default async function DriftArtifactPage({
                             muted
                             playsInline
                             preload="metadata"
-                            src={preview.videoUrl}
+                            src={currentPreview.videoUrl}
                             className="h-full w-full object-cover opacity-90 transition duration-700 group-hover:opacity-100"
                           />
                         )}
-                        <span className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1 text-[8px] uppercase tracking-[0.16em] text-stone-400 opacity-0 transition group-hover:opacity-100">
-                          {artifactType(preview.artifact) || "signal"} /{" "}
-                          {preview.artifact.title}
+                        <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-black/70 px-3 py-2">
+                          <span className="text-[8px] uppercase tracking-[0.2em] text-stone-300">
+                            Current signal / {current.title}
+                          </span>
+                          <span className="shrink-0 border border-stone-500 bg-black/55 px-2 py-1 text-[8px] uppercase tracking-[0.2em] text-stone-200 transition group-hover:border-stone-200 group-hover:text-white">
+                            Open artifact
+                          </span>
                         </span>
                       </Link>
-                    ))}
+                    )}
+                    {directionPreviews.length > 0 && (
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        {directionPreviews.map(({ artifact, color, number, preview }) => (
+                          <Link
+                            key={artifact.id}
+                            href={`/drift/${artifact.slug}?trail=${encodeURIComponent(nextTrail.join(","))}`}
+                            className="group relative aspect-[4/3] overflow-hidden border bg-black/70"
+                            style={{
+                              borderColor: color,
+                              boxShadow: `inset 0 0 0 1px ${color}55`,
+                            }}
+                          >
+                            {preview.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={preview.imageUrl}
+                                alt={artifact.title}
+                                className="h-full w-full object-cover opacity-80 transition duration-700 group-hover:opacity-100"
+                              />
+                            ) : (
+                              <video
+                                muted
+                                playsInline
+                                preload="metadata"
+                                src={preview.videoUrl}
+                                className="h-full w-full object-cover opacity-80 transition duration-700 group-hover:opacity-100"
+                              />
+                            )}
+                            <span
+                              className="absolute left-2 top-2 border bg-black/75 px-1.5 py-1 text-[8px] tracking-[0.18em]"
+                              style={{ borderColor: color, color }}
+                            >
+                              0{number}
+                            </span>
+                            <span className="absolute inset-x-0 bottom-0 bg-black/65 px-2 py-1 text-[8px] uppercase tracking-[0.14em] text-stone-300 opacity-0 transition group-hover:opacity-100">
+                              {artifact.title}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 {audioPreviews.length > 0 && (
@@ -380,12 +477,6 @@ export default async function DriftArtifactPage({
                 )}
               </div>
             )}
-            <Link
-              href={`/artifact/${current.slug}`}
-              className="mt-8 inline-block border border-stone-600 bg-black/50 px-4 py-3 text-[10px] uppercase tracking-[0.28em] text-stone-300 transition hover:border-stone-300 hover:text-white"
-            >
-              Open artifact
-            </Link>
           </section>
 
           <aside>
@@ -398,14 +489,27 @@ export default async function DriftArtifactPage({
                 Current signal
               </p>
             </div>
-            <div className="mx-auto h-8 w-px bg-cyan-700/80" />
-            <div className="mx-auto h-px w-4/5 bg-cyan-800/80" />
-            <div className="space-y-1 border-l border-cyan-900/80 pl-12">
+            <div
+              className="mx-auto h-8 w-px opacity-80"
+              style={{ backgroundColor: ARCHIVE_MAP_COLORS.root }}
+            />
+            <div
+              className="mx-auto h-px w-4/5 opacity-80"
+              style={{ backgroundColor: ARCHIVE_MAP_COLORS.root }}
+            />
+            <div
+              className="space-y-1 border-l pl-12"
+              style={{ borderColor: ARCHIVE_MAP_COLORS.root }}
+            >
               {candidates.map(({ artifact, reading }, index) => (
                 <div key={artifact.id} className="relative">
                   <ArchiveBranch
                     className="-left-12 top-0 h-14 w-12"
-                    color={["#7c8f72", "#a15c74", "#527c91"][index % 3]}
+                    color={
+                      DRIFT_DIRECTION_COLORS[
+                        index % DRIFT_DIRECTION_COLORS.length
+                      ]
+                    }
                   />
                   <Link
                     href={`/drift/${artifact.slug}?trail=${encodeURIComponent(nextTrail.join(","))}`}
@@ -421,6 +525,37 @@ export default async function DriftArtifactPage({
                 </div>
               ))}
             </div>
+            {(residueMotifs.length > 0 || residueFragments.length > 0) && (
+              <section className="mt-10 border-t border-stone-700/70 pt-4">
+                <p className="text-[9px] uppercase tracking-[0.32em] text-stone-500">
+                  Things following you
+                </p>
+                {residueMotifs.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
+                    {residueMotifs.map((motif) => (
+                      <span
+                        key={motif}
+                        className="text-[9px] uppercase tracking-[0.2em] text-stone-400"
+                      >
+                        {motif}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {residueFragments.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {residueFragments.map((fragment) => (
+                      <p
+                        key={fragment}
+                        className="font-serif text-sm italic leading-5 text-stone-500"
+                      >
+                        “{fragment}”
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
           </aside>
         </div>
 
@@ -430,13 +565,19 @@ export default async function DriftArtifactPage({
           </p>
           <div className="mt-3 flex flex-wrap gap-x-3 gap-y-2">
             {trailArtifacts.map((artifact, index) => (
-              <span
+              <Link
                 key={`${artifact.slug}-${index}`}
-                className="text-[10px] uppercase tracking-[0.18em] text-stone-400"
+                href={`/drift/${artifact.slug}?trail=${encodeURIComponent(
+                  trailArtifacts
+                    .slice(0, index)
+                    .map((trailArtifact) => trailArtifact.slug)
+                    .join(",")
+                )}`}
+                className="text-[10px] uppercase tracking-[0.18em] text-stone-400 transition hover:text-stone-100"
               >
                 {index > 0 && <span className="mr-3 text-stone-800">→</span>}
                 {artifact.title}
-              </span>
+              </Link>
             ))}
           </div>
         </footer>

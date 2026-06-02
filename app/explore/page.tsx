@@ -5,6 +5,9 @@ import {
   artifactType,
   type ArchiveArtifact,
 } from "@/lib/archive-navigation";
+import { ARCHIVE_MAP_COLORS } from "@/lib/archive-map-colors";
+
+const BAND_ORDER = ["halou", "stripmall architecture", "r/r coseboom"];
 
 function yearNumber(artifact: ArchiveArtifact) {
   return Number(artifact.year?.match(/\d{4}/)?.[0] || 0);
@@ -14,16 +17,8 @@ function isRelease(artifact: ArchiveArtifact) {
   return ["Album", "Single"].includes(artifactType(artifact));
 }
 
-function releaseType(release: ArchiveArtifact, artifacts: ArchiveArtifact[]) {
-  if (artifactType(release) === "Single") return "Single";
-
-  const tracks = artifacts.filter(
-    (artifact) =>
-      artifactType(artifact) === "Song" &&
-      (artifact.album_id === release.id || artifact.parent_id === release.id)
-  );
-
-  return tracks.length === 1 ? "Single" : "Album";
+function releaseType(release: ArchiveArtifact) {
+  return artifactType(release) === "Single" ? "Single" : "Album";
 }
 
 function MapNode({
@@ -79,7 +74,16 @@ export default async function ExplorePage() {
   })) as ArchiveArtifact[];
   const bands = artifacts
     .filter((artifact) => artifactType(artifact) === "Band")
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .sort((a, b) => {
+      const indexA = BAND_ORDER.indexOf(a.title.toLowerCase());
+      const indexB = BAND_ORDER.indexOf(b.title.toLowerCase());
+
+      if (indexA === -1 && indexB === -1) return a.title.localeCompare(b.title);
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+
+      return indexA - indexB;
+    });
   const destinationIds = new Set<string>();
 
   bands.forEach((band) => destinationIds.add(band.id));
@@ -115,8 +119,14 @@ export default async function ExplorePage() {
               Archive root
             </p>
           </div>
-          <div className="mx-auto h-12 w-px bg-cyan-700/70" />
-          <div className="mx-auto h-px w-[min(92%,72rem)] bg-cyan-800/70" />
+          <div
+            className="mx-auto h-12 w-px opacity-80"
+            style={{ backgroundColor: ARCHIVE_MAP_COLORS.root }}
+          />
+          <div
+            className="mx-auto h-px w-[min(92%,72rem)] opacity-70"
+            style={{ backgroundColor: ARCHIVE_MAP_COLORS.root }}
+          />
 
           <div className="grid gap-x-8 gap-y-16 md:grid-cols-2 xl:grid-cols-3">
           {bands.map((band) => {
@@ -137,14 +147,23 @@ export default async function ExplorePage() {
                 key={band.id}
                 className="relative pt-8"
               >
-                <div className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 bg-cyan-700/70" />
+                <div
+                  className="absolute left-1/2 top-0 h-8 w-px -translate-x-1/2 opacity-80"
+                  style={{ backgroundColor: ARCHIVE_MAP_COLORS.root }}
+                />
                 <div className="mx-auto max-w-xs">
                   <MapNode artifact={band} meta="Band / origin" tone="band" />
                 </div>
-                <div className="mx-auto h-8 w-px bg-violet-700/70" />
-                <div className="space-y-4 border-l border-violet-800/70 pl-12">
+                <div
+                  className="mx-auto h-8 w-px opacity-80"
+                  style={{ backgroundColor: ARCHIVE_MAP_COLORS.purple }}
+                />
+                <div
+                  className="space-y-4 border-l pl-12"
+                  style={{ borderColor: ARCHIVE_MAP_COLORS.purple }}
+                >
                   {releases.map((release) => {
-                    const type = releaseType(release, artifacts);
+                    const type = releaseType(release);
                     const tracks =
                       type === "Album"
                         ? artifacts
@@ -166,7 +185,11 @@ export default async function ExplorePage() {
                       >
                         <ArchiveBranch
                           className="-left-12 top-0 h-12 w-12"
-                          color={type === "Single" ? "#a15c74" : "#7c8f72"}
+                          color={
+                            type === "Single"
+                              ? ARCHIVE_MAP_COLORS.blood
+                              : ARCHIVE_MAP_COLORS.album
+                          }
                         />
                         <MapNode
                           artifact={release}
@@ -174,12 +197,15 @@ export default async function ExplorePage() {
                           tone="release"
                         />
                         {tracks.length > 0 && (
-                          <div className="relative ml-7 mt-1 grid gap-1 border-l border-cyan-900/70 pl-10">
+                          <div
+                            className="relative ml-7 mt-1 grid gap-1 border-l pl-10"
+                            style={{ borderColor: ARCHIVE_MAP_COLORS.song }}
+                          >
                             {tracks.map((track) => (
                               <div key={track.id} className="relative">
                                 <ArchiveBranch
                                   className="-left-10 top-0 h-10 w-10"
-                                  color="#527c91"
+                                  color={ARCHIVE_MAP_COLORS.song}
                                 />
                                 <MapNode artifact={track} meta="Song" />
                               </div>

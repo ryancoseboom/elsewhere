@@ -215,7 +215,7 @@ export default function AlbumTracklist({
                         </p>
                         <div className="grid grid-cols-3 gap-2">
                           {track.videos.map((video) => (
-                            <div key={video.id}>
+                            <div key={video.id} className="min-w-0">
                               <TrackThumbnail
                                 item={video}
                                 label="Video"
@@ -223,6 +223,7 @@ export default function AlbumTracklist({
                               />
                               <ArtifactMediaTitle
                                 artifactId={video.id}
+                                className="mt-1 block w-full break-words font-sans text-[9px] leading-3 text-stone-500"
                                 editable={canEdit}
                                 title={video.title}
                               />

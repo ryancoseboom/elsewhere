@@ -383,7 +383,7 @@ export async function importArchiveMaterialsAction(formData: FormData) {
 
   const { data: parent, error: parentError } = await supabase
     .from("artifacts")
-    .select("id, slug, artifact_type, kind, band_id, album_id, song_id")
+    .select("id, slug, artifact_type, kind, band_id, album_id, song_id, is_public")
     .eq("id", parentId)
     .single();
 
@@ -431,7 +431,7 @@ export async function importArchiveMaterialsAction(formData: FormData) {
       nearby: [],
       private_notes:
         note || `Imported from local archive file: ${file.name}`,
-      is_public: false,
+      is_public: Boolean(parent.is_public),
     });
 
     if (error) throw new Error(error.message);

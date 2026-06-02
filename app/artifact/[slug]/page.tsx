@@ -19,7 +19,13 @@ import ArtifactImageExperience, {
   ArtifactImageButton,
 } from "@/components/ArtifactImageExperience";
 import ArtifactSectionOrder from "@/components/ArtifactSectionOrder";
+import {
+  ArtifactEphemeraBrowser,
+  ArtifactEphemeraGroup,
+} from "@/components/ArtifactEphemeraBrowser";
+import ArtifactPageNav from "@/components/ArtifactPageNav";
 import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
+import { archiveTexture } from "@/lib/archive-textures";
 
 type Artifact = {
   id: string;
@@ -309,17 +315,13 @@ function PlaceholderVisual({
   className?: string;
   index?: number;
 }) {
-  const textures = [
-    "/textures/float/photocopy-noise.jpg",
-    "/textures/float/fingerprint-smudge.jpg",
-    "/textures/float/dust-scratches.jpg",
-  ];
+  const texture = archiveTexture(`placeholder:${label}:${index}`);
 
   return (
     <div
       className={`relative flex min-h-44 items-end overflow-hidden border border-stone-800 bg-stone-900 p-4 ${className}`}
       style={{
-        backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.35), rgba(12,10,9,0.88)), url(${textures[index % textures.length]})`,
+        backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.35), rgba(12,10,9,0.88)), url(${texture})`,
         backgroundSize: "cover",
       }}
     >
@@ -372,6 +374,7 @@ function VisualCard({
           <ArtifactImageButton
             src={item.image_url}
             alt={item.title}
+            category={pane}
             className="absolute inset-0"
             imageClassName="absolute inset-0 h-full w-full object-cover opacity-75 group-hover:scale-105 group-hover:opacity-95"
           />
@@ -379,8 +382,7 @@ function VisualCard({
           <div
             className="absolute inset-0 opacity-60"
             style={{
-              backgroundImage:
-                "linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(/textures/float/photocopy-noise.jpg)",
+              backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(${archiveTexture(`visual:${item.id}`)})`,
               backgroundSize: "cover",
             }}
           />
@@ -412,6 +414,10 @@ function getEphemeraPane(item: Artifact): EphemeraPane {
     : "Etc.";
 }
 
+function ephemeraPaneId(pane: EphemeraPane) {
+  return `ephemera-${pane.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+}
+
 function releaseYear(release: Artifact) {
   const match = release.year?.match(/\d{4}/);
   return match ? Number(match[0]) : 0;
@@ -441,8 +447,7 @@ function BandReleaseCard({
           <div
             className="h-full w-full opacity-60 transition group-hover:opacity-90"
             style={{
-              backgroundImage:
-                "linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(/textures/float/photocopy-noise.jpg)",
+              backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(${archiveTexture(`release:${release.id}`)})`,
               backgroundSize: "cover",
             }}
           />
@@ -505,42 +510,42 @@ function EphemeraPaneSection({
   if (items.length === 0 && !showDropTarget) return null;
 
   return (
-    <section className="border-t border-stone-800 pt-5">
-      <p className="mb-4 text-[10px] uppercase tracking-[0.28em] text-stone-600">
-        {pane}
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {items.map((item) => {
-          const index = allItems.findIndex((candidate) => candidate.id === item.id);
+    <ArtifactEphemeraGroup
+      id={ephemeraPaneId(pane)}
+      label={pane}
+      count={items.length}
+      collapsible={!canEdit}
+    >
+      {items.map((item) => {
+        const index = allItems.findIndex((candidate) => candidate.id === item.id);
 
-          return (
-            <VisualCard
-              key={item.id}
-              item={item}
-              index={index}
-              pane={getEphemeraPane(item)}
-              order={
-                canEdit
-                  ? {
-                      canMoveUp: index > 0,
-                      canMoveDown: index < allItems.length - 1,
-                      canDelete: ["Artwork", "Design", "Photo"].includes(
-                        getArtifactType(item)
-                      ),
-                    }
-                  : undefined
-              }
-            />
-          );
-        })}
-        {showDropTarget && (
+        return (
           <VisualCard
-            dropTargetArtifactId={artifactId}
-            index={allItems.length}
+            key={item.id}
+            item={item}
+            index={index}
+            pane={getEphemeraPane(item)}
+            order={
+              canEdit
+                ? {
+                    canMoveUp: index > 0,
+                    canMoveDown: index < allItems.length - 1,
+                    canDelete: ["Artwork", "Design", "Photo"].includes(
+                      getArtifactType(item)
+                    ),
+                  }
+                : undefined
+            }
           />
-        )}
-      </div>
-    </section>
+        );
+      })}
+      {showDropTarget && (
+        <VisualCard
+          dropTargetArtifactId={artifactId}
+          index={allItems.length}
+        />
+      )}
+    </ArtifactEphemeraGroup>
   );
 }
 
@@ -1047,7 +1052,11 @@ function VisualScrapbook({
   const visualItems = [...artwork, ...miscellaneous, ...documents];
   const floatImages = visualItems
     .filter((item) => item.image_url)
-    .map((item) => ({ src: item.image_url || "", alt: item.title }));
+    .map((item) => ({
+      src: item.image_url || "",
+      alt: item.title,
+      category: getEphemeraPane(item),
+    }));
   const visualSlotCount = canEdit
     ? Math.max(4, visualItems.length + 1)
     : visualItems.length;
@@ -1062,17 +1071,49 @@ function VisualScrapbook({
       label,
     })),
   ];
+  const ephemeraPanes = EPHEMERA_PANES.map((pane) => ({
+    count: visualItems.filter((item) => getEphemeraPane(item) === pane).length,
+    id: ephemeraPaneId(pane),
+    label: pane,
+  })).filter((pane) => pane.count > 0 || (canEdit && pane.label === "Etc."));
+  const navItems = [
+    { href: "#overview", label: "Overview" },
+    ...(isAlbumPage && albumTrackPreviews.length > 0
+      ? [{ href: "#tracks", label: "Tracks" }]
+      : []),
+    ...(isSongPage || isSingleRelease || videos.length > 0
+      ? [{ href: "#listen-watch", label: "Listen / Watch" }]
+      : []),
+    ...(ephemeraPanes.length > 0
+      ? [{ href: "#ephemera", label: "Ephemera" }]
+      : []),
+    ...(threads.length > 0 ? [{ href: "#threads", label: "Threads" }] : []),
+    ...(primaryLyrics ? [{ href: "#words", label: "Words" }] : []),
+  ];
+  const summary = [
+    ...(albumTrackPreviews.length > 0
+      ? [`${albumTrackPreviews.length} ${albumTrackPreviews.length === 1 ? "track" : "tracks"}`]
+      : []),
+    ...(floatImages.length > 0
+      ? [`${floatImages.length} ${floatImages.length === 1 ? "image" : "images"}`]
+      : []),
+    ...(threads.length > 0
+      ? [`${threads.length} ${threads.length === 1 ? "thread" : "threads"}`]
+      : []),
+  ];
 
   return (
-    <main className="min-h-screen bg-[#11100e] px-5 py-8 text-stone-200">
+    <main id="artifact-top" className="min-h-screen scroll-mt-24 bg-[#11100e] px-5 py-8 text-stone-200">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-center justify-between gap-5">
           <Breadcrumbs crumbs={breadcrumbs} />
           {canEdit && <ArchiveTools artifact={artifact} />}
         </div>
 
-        <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)]">
-          <aside>
+        <ArtifactPageNav items={navItems} summary={summary} title={artifact.title} />
+
+        <div id="overview" className="mt-10 grid scroll-mt-24 gap-8 lg:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)]">
+          <aside id="listen-watch" className="scroll-mt-24">
             {(coverImageUrl || canEdit) && <div className="border border-stone-700 bg-black p-3">
               <ArchiveHeroImageDrop
                 artifactId={artifact.id}
@@ -1092,14 +1133,16 @@ function VisualScrapbook({
             )}
 
             {isAlbumPage && albumTrackPreviews.length > 0 && !isSingleRelease && (
-              <AlbumTracklist
-                tracks={albumTrackPreviews}
-                currentArtifactId={artifact.id}
-                canEdit={canEdit}
-              />
+              <div id="tracks" className="scroll-mt-24">
+                <AlbumTracklist
+                  tracks={albumTrackPreviews}
+                  currentArtifactId={artifact.id}
+                  canEdit={canEdit}
+                />
+              </div>
             )}
 
-            {primaryAudioUrl && !isSongPage && (
+            {primaryAudioUrl && !isSongPage && !isSingleRelease && (
               <AudioFrame
                 audioUrl={primaryAudioUrl}
                 imageUrl={artifact.image_url}
@@ -1107,7 +1150,7 @@ function VisualScrapbook({
             )}
 
             <div className="mt-12 space-y-8">
-              {isSongPage && (
+              {(isSongPage || isSingleRelease) && (
                 <AudioGallery
                   items={[
                     ...(artifact.audio_url ? [artifact] : []),
@@ -1117,7 +1160,7 @@ function VisualScrapbook({
                   dropTargetArtifactId={canEdit ? artifact.id : undefined}
                 />
               )}
-              {!isAlbumPage && !isSongPage && (
+              {!isAlbumPage && !isSongPage && !isSingleRelease && (
                 <MediaList
                   title="Listen"
                   items={demos}
@@ -1130,7 +1173,7 @@ function VisualScrapbook({
                 placeholder="Moving-image fragments will appear here when attached."
                 canEdit={canEdit}
                 dropTargetArtifactId={
-                  canEdit && (isAlbumPage || isSongPage)
+                  canEdit && (isAlbumPage || isSongPage || isSingleRelease)
                     ? artifact.id
                     : undefined
                 }
@@ -1164,11 +1207,11 @@ function VisualScrapbook({
             )}
 
             {visualSlotCount > 0 && (isAlbumPage || isSingleRelease) && (
-              <section className="mt-9">
-                <p className="mb-6 text-[10px] uppercase tracking-[0.36em] text-stone-500">
+              <section id="ephemera" className="mt-9 scroll-mt-24">
+                <h2 className="mb-6 text-[10px] uppercase tracking-[0.36em] text-stone-500">
                   Ephemera
-                </p>
-                <div className="space-y-8">
+                </h2>
+                <ArtifactEphemeraBrowser panes={ephemeraPanes}>
                   {EPHEMERA_PANES.map((pane) => (
                     <EphemeraPaneSection
                       key={pane}
@@ -1181,7 +1224,7 @@ function VisualScrapbook({
                       canEdit={canEdit}
                     />
                   ))}
-                </div>
+                </ArtifactEphemeraBrowser>
               </section>
             )}
 
@@ -1210,10 +1253,10 @@ function VisualScrapbook({
             )}
 
             {threads.length > 0 && (
-              <section className="mt-12 border-t border-stone-800 pt-7">
-                <p className="mb-4 text-[10px] uppercase tracking-[0.3em] text-stone-600">
+              <section id="threads" className="mt-12 scroll-mt-24 border-t border-stone-800 pt-7">
+                <h2 className="mb-4 text-[10px] uppercase tracking-[0.3em] text-stone-600">
                   Threads
-                </p>
+                </h2>
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
                   {threads.map((thread) =>
                     thread.href ? (
@@ -1231,10 +1274,10 @@ function VisualScrapbook({
             )}
 
             {primaryLyrics && (
-              <section className="mt-12 border-t border-stone-800 pt-8">
-                <p className="mb-5 text-[10px] uppercase tracking-[0.32em] text-stone-600">
+              <section id="words" className="mt-12 scroll-mt-24 border-t border-stone-800 pt-8">
+                <h2 className="mb-5 text-[10px] uppercase tracking-[0.32em] text-stone-600">
                   Words
-                </p>
+                </h2>
                 <div className="whitespace-pre-line font-serif text-xl leading-9 text-stone-300">
                   {primaryLyrics}
                 </div>
@@ -1351,25 +1394,8 @@ export default async function ArtifactPage({
   const currentArtifactType = getArtifactType(currentArtifact);
   const isBandPage = currentArtifactType === "Band";
   const isAlbumPage = currentArtifactType === "Album";
-  const isSingleRelease =
-    currentArtifactType === "Single" || (isAlbumPage && songs.length === 1);
-  const legacySingleTrack = isSingleRelease && songs.length === 1 ? songs[0] : undefined;
-  const presentationChildArtifacts = legacySingleTrack
-    ? [
-        ...new Map(
-          [
-            ...childArtifacts.filter((child) => child.id !== legacySingleTrack.id),
-            ...allArtifacts.filter(
-              (candidate) =>
-                candidate.id !== legacySingleTrack.id &&
-                (candidate.parent_id === legacySingleTrack.id ||
-                  candidate.parent_slug === legacySingleTrack.slug ||
-                  candidate.song_id === legacySingleTrack.id)
-            ),
-          ].map((child) => [child.id, child])
-        ).values(),
-      ]
-    : childArtifacts;
+  const isSingleRelease = currentArtifactType === "Single";
+  const presentationChildArtifacts = childArtifacts;
 
   const albums = childArtifacts.filter(
     (child) => ["Album", "Single"].includes(getArtifactType(child))
@@ -1393,12 +1419,7 @@ export default async function ArtifactPage({
         })
     : [];
   const isPresentedAsSingle = (release: Artifact) =>
-    getArtifactType(release) === "Single" ||
-    [...artifactMap.values()].filter(
-      (candidate) =>
-        getArtifactType(candidate) === "Song" &&
-        (candidate.album_id === release.id || candidate.parent_id === release.id)
-    ).length === 1;
+    getArtifactType(release) === "Single";
   const bandAlbums = bandReleases.filter(
     (release) => !isPresentedAsSingle(release)
   );
@@ -1530,17 +1551,11 @@ export default async function ArtifactPage({
   const coverImageUrl =
     currentArtifact.image_url || albumArtifact?.image_url || null;
   const primaryAudioUrl =
-    isAlbumPage && !isSingleRelease
-      ? null
-      : currentArtifact.audio_url || legacySingleTrack?.audio_url || null;
+    isAlbumPage ? null : currentArtifact.audio_url || null;
   const primarySpotifyUrl =
-    currentArtifact.spotify_url ||
-    (isSingleRelease ? legacySingleTrack?.spotify_url : null) ||
-    null;
+    currentArtifact.spotify_url || null;
   const primaryLyrics =
-    isAlbumPage && !isSingleRelease
-      ? null
-      : currentArtifact.lyrics || legacySingleTrack?.lyrics || null;
+    isAlbumPage ? null : currentArtifact.lyrics || null;
   const presentationType = isSingleRelease ? "Single" : currentArtifactType;
   const archiveFloatImages = artwork
     .filter((item) => item.image_url)

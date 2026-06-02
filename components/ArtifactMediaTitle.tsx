@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 
 export default function ArtifactMediaTitle({
   artifactId,
+  className = "",
   editable,
   title,
 }: {
   artifactId: string;
+  className?: string;
   editable: boolean;
   title: string;
 }) {
@@ -45,13 +47,13 @@ export default function ArtifactMediaTitle({
   }
 
   if (!editable) {
-    return <span>{title}</span>;
+    return <span className={className}>{title}</span>;
   }
 
   return (
     <input
       aria-label={`Rename ${title}`}
-      className="min-w-0 flex-1 border-b border-transparent bg-transparent py-1 font-serif text-sm text-stone-300 outline-none transition hover:border-stone-800 focus:border-stone-600 focus:text-white disabled:opacity-50"
+      className={`min-w-0 flex-1 border-b border-transparent bg-transparent py-1 font-serif text-sm text-stone-300 outline-none transition hover:border-stone-800 focus:border-stone-600 focus:text-white disabled:opacity-50 ${className}`}
       disabled={saving}
       onBlur={() => void save()}
       onChange={(event) => setValue(event.target.value)}

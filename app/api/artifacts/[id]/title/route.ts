@@ -52,13 +52,14 @@ export async function PATCH(
 
   const type = artifact.artifact_type || artifact.kind;
   const isChildArtifact = Boolean(artifact.parent_id || artifact.parent_slug);
+  const isImage = ["Artwork", "Design", "Photo"].includes(type || "");
   const isDemo = type === "Demo" || Boolean(artifact.audio_url);
   const isVideo =
     type === "Video" || Boolean(artifact.video_url || artifact.youtube_url);
 
-  if (!isChildArtifact || (!isDemo && !isVideo)) {
+  if (!isChildArtifact || (!isImage && !isDemo && !isVideo)) {
     return Response.json(
-      { error: "Only child demos and videos can be renamed here." },
+      { error: "Only child images, demos, and videos can be renamed here." },
       { status: 400 }
     );
   }
