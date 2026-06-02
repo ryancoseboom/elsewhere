@@ -17,8 +17,25 @@ function isRelease(artifact: ArchiveArtifact) {
   return ["Album", "Single"].includes(artifactType(artifact));
 }
 
-function releaseType(release: ArchiveArtifact) {
+function releaseType(release: ArchiveArtifact, trackCount: number) {
+  if (trackCount >= 3 && trackCount <= 6) return "EP";
   return artifactType(release) === "Single" ? "Single" : "Album";
+}
+
+function releaseColor(type: "Album" | "Single" | "EP") {
+  if (type === "Single") return ARCHIVE_MAP_COLORS.single;
+  if (type === "EP") return ARCHIVE_MAP_COLORS.ep;
+  return ARCHIVE_MAP_COLORS.album;
+}
+
+function releaseMeta(release: ArchiveArtifact, type: "Album" | "Single" | "EP") {
+  const titleIncludesType = new RegExp(`\\b${type}$`, "i").test(
+    release.title.trim()
+  );
+
+  return [titleIncludesType ? null : type, release.year]
+    .filter(Boolean)
+    .join(" / ");
 }
 
 function MapNode({
@@ -106,10 +123,32 @@ export default async function ExplorePage() {
               Explore
             </h1>
           </div>
-          <p className="max-w-sm text-xs leading-6 text-stone-600">
-            Follow the visible structure. Every labeled junction is a
-            destination. Lines indicate containment, not chronology.
-          </p>
+          <div className="max-w-sm">
+            <p className="text-xs leading-6 text-stone-600">
+              Follow the visible structure. Every labeled junction is a
+              destination. Lines indicate containment, not chronology.
+            </p>
+            <div
+              aria-label="Explore map legend"
+              className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-[9px] uppercase tracking-[0.18em] text-stone-600"
+            >
+              {[
+                ["Album", ARCHIVE_MAP_COLORS.album],
+                ["EP", ARCHIVE_MAP_COLORS.ep],
+                ["Single", ARCHIVE_MAP_COLORS.single],
+                ["Song", ARCHIVE_MAP_COLORS.song],
+              ].map(([label, color]) => (
+                <span key={label} className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
         </header>
 
         <div className="mt-14">
@@ -163,18 +202,15 @@ export default async function ExplorePage() {
                   style={{ borderColor: ARCHIVE_MAP_COLORS.purple }}
                 >
                   {releases.map((release) => {
-                    const type = releaseType(release);
-                    const tracks =
-                      type === "Album"
-                        ? artifacts
-                            .filter(
-                              (artifact) =>
-                                artifactType(artifact) === "Song" &&
-                                (artifact.album_id === release.id ||
-                                  artifact.parent_id === release.id)
-                            )
-                            .sort((a, b) => a.title.localeCompare(b.title))
-                        : [];
+                    const tracks = artifacts
+                      .filter(
+                        (artifact) =>
+                          artifactType(artifact) === "Song" &&
+                          (artifact.album_id === release.id ||
+                            artifact.parent_id === release.id)
+                      )
+                      .sort((a, b) => a.title.localeCompare(b.title));
+                    const type = releaseType(release, tracks.length);
 
                     tracks.forEach((track) => destinationIds.add(track.id));
 
@@ -185,15 +221,11 @@ export default async function ExplorePage() {
                       >
                         <ArchiveBranch
                           className="-left-12 top-0 h-12 w-12"
-                          color={
-                            type === "Single"
-                              ? ARCHIVE_MAP_COLORS.blood
-                              : ARCHIVE_MAP_COLORS.album
-                          }
+                          color={releaseColor(type)}
                         />
                         <MapNode
                           artifact={release}
-                          meta={[type, release.year].filter(Boolean).join(" / ")}
+                          meta={releaseMeta(release, type)}
                           tone="release"
                         />
                         {tracks.length > 0 && (

@@ -1,8 +1,10 @@
 export const ARCHIVE_MAP_COLORS = {
-  album: "#596b45",
+  album: "#9b1b30",
   blood: "#9b1b30",
+  ep: "#b08a35",
   purple: "#7750a1",
   root: "#315f68",
+  single: "#596b45",
   song: "#37667a",
 } as const;
 
