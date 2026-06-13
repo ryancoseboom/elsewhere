@@ -143,6 +143,23 @@ body {
   }
 }
 
+@keyframes elsewhere-float-paper {
+  0% {
+    margin-left: var(--float-paper-x);
+    margin-top: var(--float-paper-y);
+  }
+
+  52% {
+    margin-left: 0;
+    margin-top: 0;
+  }
+
+  100% {
+    margin-left: calc(var(--float-paper-x) * -0.7);
+    margin-top: calc(var(--float-paper-y) * -0.7);
+  }
+}
+
 .elsewhere-archive-image {
   filter: grayscale(54%) saturate(72%) contrast(94%);
 }
@@ -177,6 +194,39 @@ button:hover > .elsewhere-archive-texture {
   grid-template-rows: repeat(8, minmax(0, 1fr));
 }
 
+.elsewhere-float-paper-field {
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.elsewhere-float-paper-scrap {
+  overflow: hidden;
+  background-position: center;
+  background-size: cover;
+  box-shadow:
+    0 0 0 1px rgba(231, 229, 228, 0.04),
+    0 18px 44px rgba(0, 0, 0, 0.42);
+  clip-path: polygon(
+    2% 1%,
+    34% 0,
+    67% 2%,
+    99% 0,
+    98% 30%,
+    100% 64%,
+    97% 100%,
+    64% 98%,
+    32% 100%,
+    1% 97%,
+    3% 66%,
+    0 31%
+  );
+  filter: grayscale(72%) brightness(56%) contrast(185%);
+  mix-blend-mode: screen;
+  animation: elsewhere-float-paper var(--float-paper-duration) ease-in-out
+    var(--float-paper-delay) infinite alternate;
+}
+
 .elsewhere-float-drift-image {
   animation: elsewhere-float-column var(--float-column-duration) ease-in-out
     var(--float-column-delay) infinite alternate;
@@ -187,6 +237,7 @@ button:hover > .elsewhere-archive-texture {
   grid-column: span var(--float-column-span);
   grid-row: span var(--float-row-span);
   min-height: 0;
+  isolation: isolate;
   transform: translate3d(
       var(--float-overlap-x, 0),
       var(--float-overlap-y, 0),
@@ -194,15 +245,77 @@ button:hover > .elsewhere-archive-texture {
     )
     rotate(var(--float-edge-rotation, 0deg))
     scale(var(--float-overlap-scale, 1));
+  box-shadow:
+    0 0 0 1px rgba(231, 229, 228, 0.06),
+    0 14px 30px rgba(0, 0, 0, var(--float-frame-shadow, 0.35));
+  -webkit-mask-image:
+    radial-gradient(ellipse at center, #000 58%, rgba(0, 0, 0, 0.94) 72%, rgba(0, 0, 0, 0.5) 88%, transparent 100%),
+    var(--float-tile-mask);
+  mask-image:
+    radial-gradient(ellipse at center, #000 58%, rgba(0, 0, 0, 0.94) 72%, rgba(0, 0, 0, 0.5) 88%, transparent 100%),
+    var(--float-tile-mask);
+  -webkit-mask-mode: alpha, luminance;
+  mask-mode: alpha, luminance;
+  -webkit-mask-position: center, center;
+  mask-position: center, center;
+  -webkit-mask-repeat: no-repeat, repeat;
+  mask-repeat: no-repeat, repeat;
+  -webkit-mask-size: 122% 122%, 190% 190%;
+  mask-size: 122% 122%, 190% 190%;
+}
+
+.elsewhere-float-tile-frame::before,
+.elsewhere-float-tile-frame::after {
+  position: absolute;
+  inset: -7%;
+  z-index: 3;
+  pointer-events: none;
+  content: "";
+}
+
+.elsewhere-float-tile-frame::before {
+  background-image: var(--float-edge-texture),
+    url("/textures/float/torn-paper-edge.jpg");
+  background-position: center, center;
+  background-size: 155% 155%, 128% 118%;
+  filter: grayscale(80%) brightness(150%) contrast(260%);
+  mix-blend-mode: screen;
+  opacity: calc(var(--float-edge-opacity, 0.08) * 1.55);
+}
+
+.elsewhere-float-tile-frame::after {
+  inset: 0;
+  background:
+    linear-gradient(to right, rgba(0, 0, 0, 0.52), transparent 10%, transparent 90%, rgba(0, 0, 0, 0.48)),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.5), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.46)),
+    url("/textures/float/rip-noise.jpg");
+  background-position: center;
+  background-size: cover, cover, 145% 145%;
+  mix-blend-mode: multiply;
+  opacity: 0.46;
 }
 
 .elsewhere-float-edge {
+  z-index: 2;
   pointer-events: none;
-  background-image: url("/textures/float/torn-paper-edge.jpg");
-  background-position: center;
-  background-size: 125% 118%;
+  background-image: var(--float-edge-texture),
+    url("/textures/float/torn-paper-edge.jpg");
+  background-position: center, center;
+  background-size: 165% 165%, 125% 118%;
   mix-blend-mode: screen;
   opacity: var(--float-edge-opacity, 0.08);
+}
+
+.elsewhere-float-tape {
+  height: 22px;
+  pointer-events: none;
+  background-image: url("/textures/float/masking-tape.jpg");
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  filter: grayscale(38%) brightness(90%) contrast(112%);
+  mix-blend-mode: screen;
+  opacity: 0.56;
 }
 
 .elsewhere-float-texture,
@@ -332,6 +445,19 @@ button:hover > .elsewhere-archive-texture {
   opacity: 0.18;
 }
 
+.elsewhere-float-analog-overlay {
+  z-index: 25;
+  pointer-events: none;
+  background-image: url("/textures/float/dust-scratches.jpg"),
+    url("/textures/float/folded-paper.jpg"),
+    radial-gradient(circle at center, transparent 38%, rgba(0, 0, 0, 0.64) 100%);
+  background-position: center, center, center;
+  background-size: cover, cover, cover;
+  filter: brightness(62%) contrast(180%);
+  mix-blend-mode: screen;
+  opacity: 0.16;
+}
+
 .elsewhere-float-paused *,
 .elsewhere-float-paused *::before,
 .elsewhere-float-paused *::after {
@@ -342,7 +468,8 @@ button:hover > .elsewhere-archive-texture {
   .elsewhere-float-drift-image,
   .elsewhere-float-texture,
   .elsewhere-float-texture-surface,
-  .elsewhere-float-image-surface {
+  .elsewhere-float-image-surface,
+  .elsewhere-float-paper-scrap {
     animation-duration: 1ms;
   }
 }

@@ -29,6 +29,20 @@ type BackdropTile = {
   residue: boolean;
 };
 
+function isImageOnlyArtifact(artifact: ArchiveArtifact) {
+  return ["Artwork", "Design", "Photo"].includes(artifactType(artifact));
+}
+
+function artifactOpenHref(artifact: ArchiveArtifact) {
+  if (isImageOnlyArtifact(artifact) && artifact.parent_slug) {
+    return `/artifact/${artifact.parent_slug}?image=${encodeURIComponent(
+      artifact.slug
+    )}`;
+  }
+
+  return `/artifact/${artifact.slug}`;
+}
+
 function driftReadings(
   current: ArchiveArtifact,
   candidate: ArchiveArtifact
@@ -386,7 +400,7 @@ export default async function DriftArtifactPage({
                   <div className="mt-4 max-w-3xl">
                     {currentPreview && (
                       <Link
-                        href={`/artifact/${current.slug}`}
+                        href={artifactOpenHref(current)}
                         className="group relative block aspect-[16/9] overflow-hidden border border-stone-500/70 bg-black/70"
                       >
                         {currentPreview.imageUrl ? (

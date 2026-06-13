@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -11,12 +12,19 @@ import {
   type TouchEvent,
 } from "react";
 import FloatRecorder, { type FloatRecording } from "./FloatRecorder";
+import { ARCHIVE_TEXTURES, archiveTextureSet } from "@/lib/archive-textures";
 import { spotifyUrl as normalizeSpotifyUrl } from "@/lib/spotify";
 
 type ExperienceImage = {
   src: string;
   alt: string;
   category?: string;
+  slug?: string;
+};
+
+type LightboxState = {
+  image: ExperienceImage;
+  routeKey: string;
 };
 
 type ArtifactImageButtonProps = ExperienceImage & {
@@ -48,25 +56,12 @@ type SaveFilePickerWindow = Window & {
 };
 
 const openImageEvent = "elsewhere:open-image";
+const closeImageEvent = "elsewhere:close-image";
 const recordingDimensions: RecordingDimensions[] = [
   { height: 1080, label: "Landscape / 1920 x 1080", width: 1920 },
   { height: 1920, label: "Portrait / 1080 x 1920", width: 1080 },
 ];
-const floatTextures = [
-  "/textures/float/black-scratches.jpg",
-  "/textures/float/blur-grunge.jpg",
-  "/textures/float/dust-scratches.jpg",
-  "/textures/float/fingerprint-smudge.jpg",
-  "/textures/float/flare-noise.jpg",
-  "/textures/float/folded-paper.jpg",
-  "/textures/float/halftone-noise.jpg",
-  "/textures/float/photocopy-noise.jpg",
-  "/textures/float/masking-tape.jpg",
-  "/textures/float/rip-noise.jpg",
-  "/textures/float/scrape.jpg",
-  "/textures/float/text-noise.jpg",
-  "/textures/float/vhs-noise.jpg",
-];
+const floatTextures = ARCHIVE_TEXTURES;
 const floatTextureCount = 7;
 
 function seededUnit(seed: number) {
@@ -110,18 +105,27 @@ function clusteredSwapDelay(seed: number, minimum: number, maximum: number) {
 
 function organicClipPath(seed: number) {
   const points = [
-    `${seededRange(seed + 1, 0, 5).toFixed(1)}% ${seededRange(seed + 2, 0, 4).toFixed(1)}%`,
-    `${seededRange(seed + 3, 28, 38).toFixed(1)}% ${seededRange(seed + 4, 0, 3).toFixed(1)}%`,
-    `${seededRange(seed + 5, 63, 73).toFixed(1)}% ${seededRange(seed + 6, 0, 4).toFixed(1)}%`,
-    `${seededRange(seed + 7, 96, 100).toFixed(1)}% ${seededRange(seed + 8, 0, 5).toFixed(1)}%`,
-    `${seededRange(seed + 9, 96, 100).toFixed(1)}% ${seededRange(seed + 10, 29, 40).toFixed(1)}%`,
-    `${seededRange(seed + 11, 96, 100).toFixed(1)}% ${seededRange(seed + 12, 64, 75).toFixed(1)}%`,
-    `${seededRange(seed + 13, 95, 100).toFixed(1)}% ${seededRange(seed + 14, 96, 100).toFixed(1)}%`,
-    `${seededRange(seed + 15, 62, 74).toFixed(1)}% ${seededRange(seed + 16, 96, 100).toFixed(1)}%`,
-    `${seededRange(seed + 17, 27, 39).toFixed(1)}% ${seededRange(seed + 18, 96, 100).toFixed(1)}%`,
-    `${seededRange(seed + 19, 0, 5).toFixed(1)}% ${seededRange(seed + 20, 95, 100).toFixed(1)}%`,
-    `${seededRange(seed + 21, 0, 4).toFixed(1)}% ${seededRange(seed + 22, 62, 75).toFixed(1)}%`,
-    `${seededRange(seed + 23, 0, 4).toFixed(1)}% ${seededRange(seed + 24, 27, 40).toFixed(1)}%`,
+    `${seededRange(seed + 1, -1, 6).toFixed(1)}% ${seededRange(seed + 2, -1, 5).toFixed(1)}%`,
+    `${seededRange(seed + 3, 12, 20).toFixed(1)}% ${seededRange(seed + 4, 0, 9).toFixed(1)}%`,
+    `${seededRange(seed + 5, 24, 34).toFixed(1)}% ${seededRange(seed + 6, -2, 4).toFixed(1)}%`,
+    `${seededRange(seed + 7, 42, 51).toFixed(1)}% ${seededRange(seed + 8, 1, 12).toFixed(1)}%`,
+    `${seededRange(seed + 9, 58, 68).toFixed(1)}% ${seededRange(seed + 10, -1, 5).toFixed(1)}%`,
+    `${seededRange(seed + 11, 79, 88).toFixed(1)}% ${seededRange(seed + 12, 0, 10).toFixed(1)}%`,
+    `${seededRange(seed + 13, 96, 101).toFixed(1)}% ${seededRange(seed + 14, -1, 6).toFixed(1)}%`,
+    `${seededRange(seed + 15, 91, 100).toFixed(1)}% ${seededRange(seed + 16, 15, 25).toFixed(1)}%`,
+    `${seededRange(seed + 17, 97, 101).toFixed(1)}% ${seededRange(seed + 18, 34, 45).toFixed(1)}%`,
+    `${seededRange(seed + 19, 90, 100).toFixed(1)}% ${seededRange(seed + 20, 54, 64).toFixed(1)}%`,
+    `${seededRange(seed + 21, 96, 101).toFixed(1)}% ${seededRange(seed + 22, 76, 86).toFixed(1)}%`,
+    `${seededRange(seed + 23, 92, 100).toFixed(1)}% ${seededRange(seed + 24, 95, 101).toFixed(1)}%`,
+    `${seededRange(seed + 25, 74, 84).toFixed(1)}% ${seededRange(seed + 26, 90, 101).toFixed(1)}%`,
+    `${seededRange(seed + 27, 57, 68).toFixed(1)}% ${seededRange(seed + 28, 96, 101).toFixed(1)}%`,
+    `${seededRange(seed + 29, 40, 50).toFixed(1)}% ${seededRange(seed + 30, 89, 100).toFixed(1)}%`,
+    `${seededRange(seed + 31, 22, 32).toFixed(1)}% ${seededRange(seed + 32, 96, 101).toFixed(1)}%`,
+    `${seededRange(seed + 33, 0, 12).toFixed(1)}% ${seededRange(seed + 34, 92, 100).toFixed(1)}%`,
+    `${seededRange(seed + 35, -1, 7).toFixed(1)}% ${seededRange(seed + 36, 74, 86).toFixed(1)}%`,
+    `${seededRange(seed + 37, 0, 10).toFixed(1)}% ${seededRange(seed + 38, 55, 66).toFixed(1)}%`,
+    `${seededRange(seed + 39, -1, 6).toFixed(1)}% ${seededRange(seed + 40, 35, 46).toFixed(1)}%`,
+    `${seededRange(seed + 41, 0, 11).toFixed(1)}% ${seededRange(seed + 42, 15, 26).toFixed(1)}%`,
   ];
 
   return `polygon(${points.join(", ")})`;
@@ -137,6 +141,7 @@ export function ArtifactImageButton({
   loading = "lazy",
 }: ArtifactImageButtonProps) {
   const positioningClass = className.includes("absolute") ? "" : "relative";
+  const overlayTextures = archiveTextureSet(`${src}:${alt}:${category || ""}`);
 
   return (
     <button
@@ -166,7 +171,15 @@ export function ArtifactImageButton({
         } ${imageClassName}`}
       />
       {!alwaysColor && (
-        <span aria-hidden className="elsewhere-archive-texture absolute inset-0" />
+        <span
+          aria-hidden
+          className="elsewhere-archive-texture absolute inset-0"
+          style={{
+            backgroundImage: overlayTextures
+              .map((texture) => `url(${texture})`)
+              .join(", "),
+          }}
+        />
       )}
     </button>
   );
@@ -191,6 +204,8 @@ function FloatTile({
   const [visible, setVisible] = useState(true);
   const image = images[imageIndex];
   const texture = textures[Math.floor(seededUnit(seed + imageIndex) * textures.length)];
+  const maskTexture = textures[Math.floor(seededUnit(seed + 61) * textures.length)];
+  const edgeTexture = textures[Math.floor(seededUnit(seed + 67) * textures.length)];
 
   useEffect(() => {
     if (images.length < 2) return;
@@ -233,11 +248,14 @@ function FloatTile({
         ...style,
         clipPath: organicClipPath(seed),
         borderRadius: `${seededRange(seed + 11, 0, 14).toFixed(1)}px ${seededRange(seed + 12, 0, 18).toFixed(1)}px ${seededRange(seed + 13, 0, 12).toFixed(1)}px ${seededRange(seed + 14, 0, 16).toFixed(1)}px`,
-        "--float-edge-rotation": `${seededRange(seed + 25, -0.75, 0.75).toFixed(2)}deg`,
+        "--float-edge-rotation": `${seededRange(seed + 25, -3.4, 3.4).toFixed(2)}deg`,
         "--float-texture-delay": `${-seededRange(seed + 26, 0, 8).toFixed(2)}s`,
         "--float-texture-duration": `${seededRange(seed + 27, 2.8, 7).toFixed(2)}s`,
-        "--float-edge-opacity": seededRange(seed + 31, 0, 0.15).toFixed(3),
-        "--float-texture-opacity": seededRange(seed + 28, 0.05, 0.2).toFixed(3),
+        "--float-edge-opacity": seededRange(seed + 31, 0.04, 0.28).toFixed(3),
+        "--float-edge-texture": `url(${edgeTexture})`,
+        "--float-frame-shadow": seededRange(seed + 32, 0.2, 0.7).toFixed(3),
+        "--float-tile-mask": `url(${maskTexture})`,
+        "--float-texture-opacity": seededRange(seed + 28, 0.08, 0.28).toFixed(3),
       } as CSSProperties}
       onClick={() => onOpen(image)}
     >
@@ -261,6 +279,18 @@ function FloatTile({
         aria-hidden
         className="elsewhere-float-edge absolute inset-0"
       />
+      {seededUnit(seed + 41) > 0.63 && (
+        <span
+          aria-hidden
+          className="elsewhere-float-tape absolute"
+          style={{
+            left: `${seededRange(seed + 42, 4, 72).toFixed(1)}%`,
+            top: `${seededRange(seed + 43, -3, 7).toFixed(1)}%`,
+            transform: `rotate(${seededRange(seed + 44, -10, 10).toFixed(2)}deg)`,
+            width: `${seededRange(seed + 45, 18, 42).toFixed(1)}%`,
+          }}
+        />
+      )}
     </button>
   );
 }
@@ -333,6 +363,44 @@ function FloatTextureFragment({
         } as CSSProperties}
       />
     </div>
+  );
+}
+
+function FloatPaperScrap({
+  index,
+  seed,
+  textures,
+}: {
+  index: number;
+  seed: number;
+  textures: string[];
+}) {
+  const texture = textures[Math.floor(seededUnit(seed + 1) * textures.length)];
+
+  return (
+    <span
+      aria-hidden
+      className="elsewhere-float-paper-scrap absolute"
+      style={{
+        backgroundImage: `url(${texture})`,
+        height: `${seededRange(seed + 2, 16, 62).toFixed(1)}%`,
+        left: `${seededRange(seed + 3, -14, 92).toFixed(1)}%`,
+        opacity: seededRange(seed + 4, 0.1, 0.34).toFixed(3),
+        top: `${seededRange(seed + 5, -16, 88).toFixed(1)}%`,
+        transform: `rotate(${seededRange(seed + 6, -8, 8).toFixed(2)}deg)`,
+        width: `${seededRange(seed + 7, 10, 46).toFixed(1)}%`,
+        "--float-paper-delay": `${-seededRange(seed + 8, 0, 22).toFixed(2)}s`,
+        "--float-paper-duration": `${seededRange(seed + 9, 16, 36).toFixed(2)}s`,
+        "--float-paper-x": `${seededRange(seed + 10, -2.4, 2.4).toFixed(2)}%`,
+        "--float-paper-y": `${seededRange(seed + 11, -2.4, 2.4).toFixed(2)}%`,
+      } as CSSProperties}
+    >
+      {index % 4 === 0 && (
+        <span className="absolute bottom-3 left-4 font-mono text-[9px] tracking-[0.42em] text-stone-300/30">
+          {String(index + 1).padStart(2, "0")} / FLOAT
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -474,19 +542,32 @@ function FloatImageFragment({
 export default function ArtifactImageExperience({
   autoLaunch = false,
   images,
+  initialImageSlug,
   returnHref,
   showTrigger = true,
   spotifyUrl,
 }: {
   autoLaunch?: boolean;
   images: ExperienceImage[];
+  initialImageSlug?: string;
   returnHref?: string;
   showTrigger?: boolean;
   spotifyUrl?: string | null;
 }) {
-  const [lightboxImage, setLightboxImage] = useState<ExperienceImage | null>(
-    null
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchParamString = searchParams.toString();
+  const routeKey = `${pathname}?${searchParamString}`;
+  const [lightboxState, setLightboxState] = useState<LightboxState | null>(
+    () => {
+      const initialImage = initialImageSlug
+        ? images.find((image) => image.slug === initialImageSlug)
+        : undefined;
+      return initialImage ? { image: initialImage, routeKey } : null;
+    }
   );
+  const lightboxImage =
+    lightboxState?.routeKey === routeKey ? lightboxState.image : null;
   const [floating, setFloating] = useState(autoLaunch && images.length > 0);
   const [floatSeed, setFloatSeed] = useState(0);
   const [floatSetup, setFloatSetup] = useState<"record" | "dimensions" | null>(
@@ -526,12 +607,13 @@ export default function ArtifactImageExperience({
 
       const nextIndex =
         (currentIndex + offset + lightboxImages.length) % lightboxImages.length;
-      setLightboxImage(lightboxImages[nextIndex]);
+      setLightboxState({ image: lightboxImages[nextIndex], routeKey });
     },
-    [lightboxImage, lightboxImages]
+    [lightboxImage, lightboxImages, routeKey]
   );
+
   const closeLightbox = useCallback(() => {
-    setLightboxImage(null);
+    setLightboxState(null);
     window.setTimeout(() => previousActiveElementRef.current?.focus(), 0);
   }, []);
 
@@ -601,7 +683,14 @@ export default function ArtifactImageExperience({
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
-      setLightboxImage((event as CustomEvent<ExperienceImage>).detail);
+      setLightboxState({
+        image: (event as CustomEvent<ExperienceImage>).detail,
+        routeKey,
+      });
+    }
+
+    function closeImage() {
+      setLightboxState(null);
     }
 
     function closeOnEscape(event: KeyboardEvent) {
@@ -643,13 +732,21 @@ export default function ArtifactImageExperience({
     }
 
     window.addEventListener(openImageEvent, openImage);
+    window.addEventListener(closeImageEvent, closeImage);
     window.addEventListener("keydown", closeOnEscape);
 
     return () => {
       window.removeEventListener(openImageEvent, openImage);
+      window.removeEventListener(closeImageEvent, closeImage);
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [closeLightbox, lightboxImage, moveLightbox]);
+  }, [closeLightbox, lightboxImage, moveLightbox, routeKey]);
+
+  useEffect(() => {
+    if (new URLSearchParams(searchParamString).has("image")) return;
+
+    window.dispatchEvent(new Event(closeImageEvent));
+  }, [pathname, searchParamString]);
 
   useEffect(() => {
     if (!lightboxOpen) return;
@@ -751,6 +848,11 @@ export default function ArtifactImageExperience({
       initialImageIndex: Math.floor(seededUnit(seed) * images.length),
     };
   });
+  const paperScraps = Array.from({ length: 12 }, (_, index) => ({
+    index,
+    key: `paper-${floatSeed}-${index}`,
+    seed: floatSeed + index * 59 + 3401,
+  }));
   return (
     <>
       {showTrigger && (images.length > 0 || streamUrl) && (
@@ -999,7 +1101,7 @@ export default function ArtifactImageExperience({
                         ? "border-stone-200 opacity-100"
                         : "border-stone-700 opacity-55 hover:border-stone-400 hover:opacity-100"
                     }`}
-                    onClick={() => setLightboxImage(image)}
+                    onClick={() => setLightboxState({ image, routeKey })}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -1049,13 +1151,23 @@ export default function ArtifactImageExperience({
       {floating && (
         <div
           ref={floatRef}
-          className={`fixed inset-0 z-[80] overflow-hidden bg-black ${
+          className={`elsewhere-float-stage fixed inset-0 z-[80] overflow-hidden bg-black ${
             pageHidden ? "elsewhere-float-paused" : ""
           }`}
           onPointerMove={moveFloat}
           onPointerLeave={resetFloatPointer}
         >
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(68,64,60,0.18),transparent_65%)]" />
+          <div className="elsewhere-float-paper-field absolute inset-0">
+            {paperScraps.map((scrap) => (
+              <FloatPaperScrap
+                key={scrap.key}
+                index={scrap.index}
+                seed={scrap.seed}
+                textures={sessionTextures}
+              />
+            ))}
+          </div>
           <div className="elsewhere-float-texture-mosaic absolute inset-0 grid">
             {organicLayers.map((layer) => (
               <FloatTextureFragment
@@ -1083,13 +1195,14 @@ export default function ArtifactImageExperience({
                 key={tile.key}
                 images={images}
                 initialImageIndex={tile.initialImageIndex}
-                onOpen={setLightboxImage}
+                onOpen={(image) => setLightboxState({ image, routeKey })}
                 seed={tile.seed}
                 style={tile.style}
                 textures={sessionTextures}
               />
             ))}
           </div>
+          <div aria-hidden className="elsewhere-float-analog-overlay absolute inset-0" />
           {recording ? (
             <FloatRecorder
               height={recording.height}

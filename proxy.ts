@@ -4,6 +4,23 @@ export function proxy(request: NextRequest) {
   const basicAuth = request.headers.get("authorization");
 
   if (request.nextUrl.pathname.startsWith("/backroom")) {
+    if (request.nextUrl.pathname === "/backroom/logout") {
+      const response = new NextResponse("Backroom access closed.", {
+        status: 401,
+        headers: {
+          "Cache-Control": "no-store",
+          "WWW-Authenticate": 'Basic realm="Backroom"',
+        },
+      });
+      response.cookies.set("elsewhere_backroom", "", {
+        httpOnly: true,
+        maxAge: 0,
+        path: "/",
+        sameSite: "lax",
+      });
+      return response;
+    }
+
     if (basicAuth?.startsWith("Basic ")) {
       try {
         const authValue = basicAuth.slice(6);

@@ -188,6 +188,13 @@ const orphanArtifacts = items.filter(
           >
             Rewrite media labels
           </Link>
+
+          <Link
+            href="/backroom/logout"
+            className="inline-flex w-fit rounded-full border border-stone-800 px-6 py-3 text-xs uppercase tracking-[0.25em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
+          >
+            Log out
+          </Link>
         </header>
 
         {items.length > 0 ? (

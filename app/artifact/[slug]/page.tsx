@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import AudioFrame from "@/components/AudioFrame";
@@ -10,6 +10,7 @@ import ArchiveHeroImageDrop from "@/components/ArchiveHeroImageDrop";
 import ArchiveImageDrop from "@/components/ArchiveImageDrop";
 import ArchiveAudioDrop from "@/components/ArchiveAudioDrop";
 import ArchiveVideoDrop from "@/components/ArchiveVideoDrop";
+import ArtifactBreadcrumbLink from "@/components/ArtifactBreadcrumbLink";
 import { getVideoEmbedUrl, getYouTubeThumbnailUrl } from "@/lib/video";
 import ArtifactEphemeraPaneSelect from "@/components/ArtifactEphemeraPaneSelect";
 import { EPHEMERA_PANES, type EphemeraPane } from "@/lib/ephemera";
@@ -25,7 +26,7 @@ import {
 } from "@/components/ArtifactEphemeraBrowser";
 import ArtifactPageNav from "@/components/ArtifactPageNav";
 import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
-import { archiveTexture } from "@/lib/archive-textures";
+import { archiveTexture, archiveTextureSet } from "@/lib/archive-textures";
 
 type Artifact = {
   id: string;
@@ -62,6 +63,10 @@ function normalizeList(items: string[] | null) {
 
 function getArtifactType(artifact: Artifact) {
   return artifact.artifact_type || artifact.kind || "";
+}
+
+function isImageOnlyArtifact(artifact: Artifact) {
+  return ["Artwork", "Design", "Photo"].includes(getArtifactType(artifact));
 }
 
 function hasValidBackroomAuthorization(value: string | null) {
@@ -238,12 +243,12 @@ function Breadcrumbs({
       {crumbs.map((crumb) => (
         <span key={crumb.slug} className="flex items-center gap-2">
           <span>/</span>
-          <Link
+          <ArtifactBreadcrumbLink
             href={`/artifact/${crumb.slug}`}
             className="hover:text-stone-300"
           >
             {crumb.title}
-          </Link>
+          </ArtifactBreadcrumbLink>
         </span>
       ))}
     </div>
@@ -272,11 +277,11 @@ function addChildHref(artifact: Artifact) {
 
 function ArchiveTools({ artifact }: { artifact: Artifact }) {
   return (
-    <details className="group relative">
+    <details className="group relative z-[70]">
       <summary className="cursor-pointer list-none border border-stone-800 px-3 py-2 text-[9px] uppercase tracking-[0.24em] text-stone-600 transition hover:border-stone-600 hover:text-stone-300">
         Archive tools
       </summary>
-      <div className="absolute right-0 top-full z-40 mt-2 w-52 border border-stone-800 bg-[#11100e] p-2 shadow-2xl">
+      <div className="absolute right-0 top-full z-[90] mt-2 w-52 border border-stone-800 bg-[#11100e] p-2 shadow-2xl">
         <Link
           href={`/backroom/artifacts/${artifact.slug}/edit`}
           className="block px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-stone-400 transition hover:bg-stone-900 hover:text-stone-100"
@@ -301,6 +306,12 @@ function ArchiveTools({ artifact }: { artifact: Artifact }) {
         >
           Open backroom
         </Link>
+        <Link
+          href="/backroom/logout"
+          className="mt-2 block border-t border-stone-800 px-3 py-2 pt-3 text-[10px] uppercase tracking-[0.2em] text-stone-700 transition hover:bg-stone-900 hover:text-stone-300"
+        >
+          Log out
+        </Link>
       </div>
     </details>
   );
@@ -315,14 +326,17 @@ function PlaceholderVisual({
   className?: string;
   index?: number;
 }) {
-  const texture = archiveTexture(`placeholder:${label}:${index}`);
+  const textures = archiveTextureSet(`placeholder:${label}:${index}`);
 
   return (
     <div
       className={`relative flex min-h-44 items-end overflow-hidden border border-stone-800 bg-stone-900 p-4 ${className}`}
       style={{
-        backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.35), rgba(12,10,9,0.88)), url(${texture})`,
-        backgroundSize: "cover",
+        backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.35), rgba(12,10,9,0.88)), ${textures
+          .map((texture) => `url(${texture})`)
+          .join(", ")}`,
+        backgroundPosition: "center, center, center, center",
+        backgroundSize: "cover, cover, cover, 150%",
       }}
     >
       <p className="max-w-44 text-[10px] uppercase tracking-[0.2em] text-stone-500">
@@ -382,8 +396,13 @@ function VisualCard({
           <div
             className="absolute inset-0 opacity-60"
             style={{
-              backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), url(${archiveTexture(`visual:${item.id}`)})`,
-              backgroundSize: "cover",
+              backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.2), rgba(12,10,9,0.9)), ${archiveTextureSet(
+                `visual:${item.id}`
+              )
+                .map((texture) => `url(${texture})`)
+                .join(", ")}`,
+              backgroundPosition: "center, center, center, center",
+              backgroundSize: "cover, cover, cover, 150%",
             }}
           />
         )}
@@ -602,7 +621,10 @@ function BandScrapbook({
             </h1>
             {releaseImages.length > 0 && (
               <div className="mt-6">
-                <ArtifactImageExperience images={releaseImages} />
+                <ArtifactImageExperience
+                  key={artifact.slug}
+                  images={releaseImages}
+                />
               </div>
             )}
             {artifact.fragment && (
@@ -906,6 +928,7 @@ function EditorialDossier({
           </div>
           <div className="mt-6">
             <ArtifactImageExperience
+              key={artifact.slug}
               images={floatImages}
               spotifyUrl={artifact.spotify_url}
             />
@@ -1029,6 +1052,7 @@ function VisualScrapbook({
   miscellaneous,
   nearby,
   canEdit,
+  initialImageSlug,
 }: {
   artifact: Artifact;
   presentationType: string;
@@ -1048,6 +1072,7 @@ function VisualScrapbook({
   miscellaneous: Artifact[];
   nearby: Artifact[];
   canEdit: boolean;
+  initialImageSlug?: string;
 }) {
   const visualItems = [...artwork, ...miscellaneous, ...documents];
   const floatImages = visualItems
@@ -1056,6 +1081,7 @@ function VisualScrapbook({
       src: item.image_url || "",
       alt: item.title,
       category: getEphemeraPane(item),
+      slug: item.slug,
     }));
   const visualSlotCount = canEdit
     ? Math.max(4, visualItems.length + 1)
@@ -1196,7 +1222,9 @@ function VisualScrapbook({
             </h1>
             <div className="mt-6">
               <ArtifactImageExperience
+                key={`${artifact.slug}:${initialImageSlug || ""}`}
                 images={floatImages}
+                initialImageSlug={initialImageSlug}
                 spotifyUrl={primarySpotifyUrl}
               />
             </div>
@@ -1295,10 +1323,18 @@ export default async function ArtifactPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ view?: string | string[] }>;
+  searchParams: Promise<{
+    image?: string | string[];
+    view?: string | string[];
+  }>;
 }) {
   const { slug } = await params;
-  const requestedView = (await searchParams).view;
+  const resolvedSearchParams = await searchParams;
+  const requestedView = resolvedSearchParams.view;
+  const requestedImage = resolvedSearchParams.image;
+  const initialImageSlug = Array.isArray(requestedImage)
+    ? requestedImage[0]
+    : requestedImage;
   const viewValue = Array.isArray(requestedView)
     ? requestedView[0]
     : requestedView;
@@ -1357,6 +1393,27 @@ export default async function ArtifactPage({
   const artifactMap = new Map<string, Artifact>();
   allArtifacts.forEach((item) => artifactMap.set(item.id, item));
   artifactMap.set(currentArtifact.id, currentArtifact);
+  const artifactSlugMap = new Map<string, Artifact>();
+  allArtifacts.forEach((item) => artifactSlugMap.set(item.slug, item));
+  artifactSlugMap.set(currentArtifact.slug, currentArtifact);
+
+  if (isImageOnlyArtifact(currentArtifact)) {
+    const parentArtifact =
+      (currentArtifact.parent_id
+        ? artifactMap.get(currentArtifact.parent_id)
+        : undefined) ||
+      (currentArtifact.parent_slug
+        ? artifactSlugMap.get(currentArtifact.parent_slug)
+        : undefined);
+
+    if (parentArtifact) {
+      redirect(
+        `/artifact/${parentArtifact.slug}?image=${encodeURIComponent(
+          currentArtifact.slug
+        )}`
+      );
+    }
+  }
 
   const breadcrumbIds = [
     currentArtifact.band_id,
@@ -1559,7 +1616,11 @@ export default async function ArtifactPage({
   const presentationType = isSingleRelease ? "Single" : currentArtifactType;
   const archiveFloatImages = artwork
     .filter((item) => item.image_url)
-    .map((item) => ({ src: item.image_url || "", alt: item.title }));
+    .map((item) => ({
+      src: item.image_url || "",
+      alt: item.title,
+      slug: item.slug,
+    }));
 
   const nearbyArtifacts = allArtifacts
     .map((candidate) => ({
@@ -1635,6 +1696,7 @@ export default async function ArtifactPage({
         miscellaneous={miscellaneousChildren}
         nearby={nearbyArtifacts}
         canEdit={canEdit}
+        initialImageSlug={initialImageSlug}
       />
     );
   }
@@ -1745,7 +1807,9 @@ export default async function ArtifactPage({
             </h1>
             <div className="mt-6">
               <ArtifactImageExperience
+                key={`${currentArtifact.slug}:${initialImageSlug || ""}`}
                 images={archiveFloatImages}
+                initialImageSlug={initialImageSlug}
                 spotifyUrl={currentArtifact.spotify_url}
               />
             </div>
