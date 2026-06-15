@@ -1915,42 +1915,16 @@ export default async function ArtifactPage({
     : ordinaryNearbyArtifacts;
 
   if (artifactFloatMode) {
-    const fallbackImageUrl =
-      currentArtifact.image_url ||
-      albumArtifact?.image_url ||
-      artwork.find((item) => item.image_url)?.image_url ||
-      nearbyArtifacts.find((item) => item.image_url)?.image_url ||
-      allArtifacts.find((item) => item.image_url)?.image_url ||
-      null;
-    const relationshipPool = allArtifacts.filter((candidate) => {
-      if (!candidate.image_url) return false;
-
-      return (
-        candidate.parent_id === currentArtifact.id ||
-        candidate.parent_slug === currentArtifact.slug ||
-        candidate.song_id === currentArtifact.id ||
-        candidate.album_id === currentArtifact.id ||
-        candidate.album_id === currentArtifact.album_id ||
-        candidate.band_id === currentArtifact.band_id ||
-        Boolean(scoreNearby(currentArtifact, candidate))
-      );
-    });
     const floatArtifactMap = new Map<string, FloatExperimentArtifact>();
 
     [
-      artifactFloatExperimentArtifact(currentArtifact, fallbackImageUrl),
-      ...(albumArtifact
-        ? [artifactFloatExperimentArtifact(albumArtifact)]
-        : []),
+      artifactFloatExperimentArtifact(currentArtifact),
       ...childArtifacts.map((item) => artifactFloatExperimentArtifact(item)),
-      ...albumTracks.map((item) => artifactFloatExperimentArtifact(item)),
-      ...nearbyArtifacts.map((item) => artifactFloatExperimentArtifact(item)),
-      ...relationshipPool.map((item) => artifactFloatExperimentArtifact(item)),
     ].forEach((item) => {
-      if (item.image_url) floatArtifactMap.set(item.id, item);
+      floatArtifactMap.set(item.id, item);
     });
 
-    const floatArtifacts = [...floatArtifactMap.values()].slice(0, 48);
+    const floatArtifacts = [...floatArtifactMap.values()];
     const experimentSeed = [...currentArtifact.slug].reduce(
       (total, char, index) => total + char.charCodeAt(0) * (index + 17),
       1701

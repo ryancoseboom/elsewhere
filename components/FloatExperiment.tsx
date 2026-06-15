@@ -8,7 +8,10 @@ import {
   useSyncExternalStore,
   type CSSProperties,
 } from "react";
-import { archiveTextureSet } from "@/lib/archive-textures";
+import {
+  ARCHIVE_TEXTURES,
+  archiveTextureIndices,
+} from "@/lib/archive-textures";
 
 export type FloatExperimentArtifact = {
   album: string | null;
@@ -36,19 +39,27 @@ export type FloatExperimentArtifact = {
 };
 
 type MemoryPiece = {
+  align: string;
   artifact: FloatExperimentArtifact;
+  gridColumn: string;
+  gridRow: string;
   height: number;
+  heightCss: string;
   imageRotate: number;
   isAnchor: boolean;
+  isTiny: boolean;
   label: string;
   left: number;
   opacity: number;
   principles: string[];
   reasons: string[];
   rotate: number;
+  textureIndices: number[];
   top: number;
   treatment: "alive" | "faded" | "ghost";
   width: number;
+  widthCss: string;
+  justify: string;
   zIndex: number;
 };
 
@@ -71,6 +82,11 @@ type TransmissionText = {
   zIndex: number;
 };
 
+type CatalogSignal = {
+  text: string;
+  seed: number;
+};
+
 const ELSEWHERE_FLOAT_INTENSITY_V2 = true;
 const mutationGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#/*-+<>[]{}?";
 
@@ -84,25 +100,101 @@ const designPrinciples = [
 ];
 
 const layoutSlots = [
-  { height: 42, left: 36, top: 22, width: 25 },
-  { height: 31, left: 12, top: 18, width: 20 },
-  { height: 25, left: 63, top: 12, width: 18 },
-  { height: 28, left: 23, top: 55, width: 19 },
-  { height: 23, left: 56, top: 56, width: 17 },
-  { height: 18, left: 75, top: 41, width: 14 },
-  { height: 19, left: 7, top: 62, width: 15 },
-  { height: 17, left: 43, top: 6, width: 13 },
-  { height: 20, left: 70, top: 70, width: 16 },
-  { height: 15, left: 31, top: 78, width: 14 },
-  { height: 14, left: 82, top: 18, width: 11 },
-  { height: 13, left: 4, top: 35, width: 12 },
-  { height: 16, left: 48, top: 77, width: 12 },
-  { height: 13, left: 17, top: 7, width: 11 },
-  { height: 24, left: 87, top: 57, width: 12 },
-  { height: 20, left: 39, top: 39, width: 15 },
-  { height: 14, left: 61, top: 83, width: 13 },
-  { height: 17, left: 2, top: 11, width: 12 },
+  {
+    align: "stretch",
+    gridColumn: "5 / span 4",
+    gridRow: "2 / span 5",
+    height: 48,
+    heightCss: "100%",
+    justify: "stretch",
+    left: 33,
+    top: 14,
+    width: 34,
+    widthCss: "100%",
+  },
+  {
+    align: "stretch",
+    gridColumn: "1 / span 2",
+    gridRow: "2 / span 3",
+    height: 29,
+    heightCss: "100%",
+    justify: "stretch",
+    left: 6,
+    top: 12,
+    width: 18,
+    widthCss: "100%",
+  },
+  {
+    align: "stretch",
+    gridColumn: "10 / span 2",
+    gridRow: "1 / span 3",
+    height: 22,
+    heightCss: "100%",
+    justify: "stretch",
+    left: 72,
+    top: 9,
+    width: 18,
+    widthCss: "100%",
+  },
+  {
+    align: "stretch",
+    gridColumn: "2 / span 2",
+    gridRow: "6 / span 2",
+    height: 19,
+    heightCss: "100%",
+    justify: "stretch",
+    left: 10,
+    top: 55,
+    width: 15,
+    widthCss: "100%",
+  },
+  {
+    align: "stretch",
+    gridColumn: "9 / span 3",
+    gridRow: "5 / span 3",
+    height: 25,
+    heightCss: "100%",
+    justify: "stretch",
+    left: 62,
+    top: 52,
+    width: 20,
+    widthCss: "100%",
+  },
+  {
+    align: "stretch",
+    gridColumn: "12 / span 1",
+    gridRow: "3 / span 2",
+    height: 14,
+    heightCss: "100%",
+    justify: "stretch",
+    left: 84,
+    top: 40,
+    width: 10,
+    widthCss: "100%",
+  },
+  { align: "center", gridColumn: "4", gridRow: "1", height: 8, heightCss: "72px", justify: "center", left: 29, top: 72, width: 7, widthCss: "72px" },
+  { align: "end", gridColumn: "8", gridRow: "8", height: 6, heightCss: "58px", justify: "center", left: 79, top: 76, width: 6, widthCss: "58px" },
+  { align: "center", gridColumn: "12", gridRow: "8", height: 5, heightCss: "50px", justify: "center", left: 50, top: 6, width: 5, widthCss: "50px" },
+  { align: "center", gridColumn: "1", gridRow: "5", height: 9, heightCss: "84px", justify: "center", left: 91, top: 62, width: 7, widthCss: "84px" },
+  { align: "center", gridColumn: "7", gridRow: "1", height: 7, heightCss: "64px", justify: "center", left: 18, top: 81, width: 6, widthCss: "64px" },
+  { align: "center", gridColumn: "4", gridRow: "8", height: 5, heightCss: "50px", justify: "center", left: 3, top: 38, width: 5, widthCss: "50px" },
 ];
+
+function fixed(value: number, digits = 2) {
+  return value.toFixed(digits);
+}
+
+function cssPercent(value: number) {
+  return `${fixed(value)}%`;
+}
+
+function cssDegrees(value: number) {
+  return `${fixed(value)}deg`;
+}
+
+function cssNumber(value: number) {
+  return fixed(value);
+}
 
 function seededUnit(seed: number) {
   const value = Math.sin(seed * 9283.37) * 10000;
@@ -315,9 +407,11 @@ function buildScene(
   seed: number,
   cycle: number
 ): MemoryPiece[] {
-  if (!artifacts.length) return [];
+  const imageArtifacts = artifacts.filter((artifact) => artifact.image_url);
 
-  const anchorPool = [...artifacts].sort((left, right) => {
+  if (!imageArtifacts.length) return [];
+
+  const anchorPool = [...imageArtifacts].sort((left, right) => {
     const leftScore = richness(left) + seededRange(seed + left.id.length, 0, 8);
     const rightScore = richness(right) + seededRange(seed + right.id.length, 0, 8);
     return rightScore - leftScore;
@@ -326,7 +420,7 @@ function buildScene(
     anchorPool[Math.floor(seededUnit(seed + cycle * 97) * Math.min(anchorPool.length, 18))] ||
     anchorPool[0];
 
-  const related = artifacts
+  const related = imageArtifacts
     .filter((artifact) => artifact.id !== anchor.id)
     .map((artifact, index) => {
       const rel = relationship(anchor, artifact);
@@ -334,12 +428,23 @@ function buildScene(
       return { artifact, rel, score: rel.score + accident };
     })
     .sort((left, right) => right.score - left.score)
-    .slice(0, 13);
+    .slice(0, layoutSlots.length - 1);
 
   const selected = [
     { artifact: anchor, rel: relationship(anchor, anchor) },
     ...related.map((item) => ({ artifact: item.artifact, rel: item.rel })),
   ];
+
+  for (let index = selected.length; index < layoutSlots.length; index += 1) {
+    const artifact = imageArtifacts[index % imageArtifacts.length];
+    selected.push({
+      artifact,
+      rel: {
+        reasons: [`repeated source crop from ${artifact.title}`],
+        score: 1,
+      },
+    });
+  }
 
   return selected.map((item, index) => {
     const slot = layoutSlots[index % layoutSlots.length];
@@ -348,29 +453,37 @@ function buildScene(
       ? item.rel.reasons
       : ["accidental juxtaposition: no strong metadata tie, but the image surfaced nearby"];
     const piece: MemoryPiece = {
+      align: slot.align,
       artifact: item.artifact,
-      height: Math.max(9, slot.height + seededRange(itemSeed + 1, -3.5, 4.5)),
+      gridColumn: slot.gridColumn,
+      gridRow: slot.gridRow,
+      height: slot.height,
+      heightCss: slot.heightCss,
       imageRotate: seededUnit(itemSeed + 11) > 0.84 ? 180 : 0,
       isAnchor: index === 0,
+      isTiny: slot.width <= 7 || slot.height <= 8,
       label:
         index === 0
           ? "current remembered center"
           : item.rel.score > 20
             ? "related evidence"
             : "accidental echo",
-      left: Math.max(1, Math.min(88, slot.left + seededRange(itemSeed + 2, -3.5, 3.5))),
+      left: slot.left,
       opacity: index === 0 ? 1 : seededRange(itemSeed + 3, 0.52, 0.88),
       principles: [],
       reasons,
-      rotate: seededRange(itemSeed + 4, -5.2, 5.2),
-      top: Math.max(2, Math.min(84, slot.top + seededRange(itemSeed + 5, -3.5, 3.5))),
+      rotate: 0,
+      textureIndices: archiveTextureIndices(`${item.artifact.slug}:${seed}:${cycle}:${index}`, 3),
+      top: slot.top,
       treatment:
         seededUnit(itemSeed + 9) < 0.76
           ? "alive"
           : seededUnit(itemSeed + 9) < 0.94
             ? "faded"
             : "ghost",
-      width: Math.max(9, slot.width + seededRange(itemSeed + 6, -2.5, 3.5)),
+      width: slot.width,
+      widthCss: slot.widthCss,
+      justify: slot.justify,
       zIndex: index === 0 ? 30 : 10 + layoutSlots.length - index,
     };
     piece.principles = principlesFor(piece);
@@ -398,48 +511,114 @@ function buildTransmissionText(
     { reason: "fallback corrupted caption", source: "system", text: "DO NOT TRUST THE IMAGE" },
   ];
   const signals = pool.length ? pool : fallback;
-  const count = ELSEWHERE_FLOAT_INTENSITY_V2 ? 26 : 8;
+  const count = ELSEWHERE_FLOAT_INTENSITY_V2 ? 96 : 8;
   const classes = [
     "elsewhere-memory-text--micro",
     "elsewhere-memory-text--small",
     "elsewhere-memory-text--caption",
-    "elsewhere-memory-text--medium",
-    "elsewhere-memory-text--large",
-    "elsewhere-memory-text--huge",
+    "elsewhere-memory-text--small",
+    "elsewhere-memory-text--micro",
+    "elsewhere-memory-text--caption",
   ];
 
   return Array.from({ length: count }, (_, index) => {
     const textSeed = seed + cycle * 509 + index * 73;
     const signal =
       signals[Math.floor(seededUnit(textSeed + 1) * signals.length)] || fallback[0];
+    const isParagraph = index % 17 === 4 || index % 23 === 9;
     const sizeIndex = Math.min(
       classes.length - 1,
-      Math.floor(Math.pow(seededUnit(textSeed + 2), 1.7) * classes.length)
+      Math.floor(Math.pow(seededUnit(textSeed + 2), 2.4) * classes.length)
     );
+    const paragraphLines = Array.from({ length: 3 }, (_, lineIndex) => {
+      const lineSignal =
+        signals[Math.floor(seededUnit(textSeed + 19 + lineIndex * 11) * signals.length)] ||
+        fallback[0];
+
+      return clip(lineSignal.text.toUpperCase(), 62);
+    });
 
     return {
       blur: seededUnit(textSeed + 3) < 0.18 ? seededRange(textSeed + 4, 0.4, 2.8) : 0,
-      className: classes[sizeIndex],
+      className: isParagraph ? "elsewhere-memory-text--paragraph" : classes[sizeIndex],
       left: seededRange(textSeed + 5, -7, 93),
       mutate: seededUnit(textSeed + 6) > 0.28,
-      opacity: seededRange(textSeed + 7, 0.12, sizeIndex > 3 ? 0.42 : 0.68),
+      opacity: isParagraph
+        ? seededRange(textSeed + 7, 0.18, 0.42)
+        : seededRange(textSeed + 7, 0.14, 0.56),
       reason: signal.reason,
-      rotate: seededRange(textSeed + 8, -10, 9),
+      rotate: 0,
       source: signal.source,
-      text: clip(signal.text.toUpperCase(), sizeIndex > 3 ? 54 : 92),
+      text: isParagraph
+        ? paragraphLines.join("\n")
+        : clip(signal.text.toUpperCase(), sizeIndex > 3 ? 54 : 92),
       top: seededRange(textSeed + 9, 5, 88),
       zIndex: seededUnit(textSeed + 10) > 0.48 ? 24 : 6,
     } satisfies TransmissionText;
   });
 }
 
-function centralSignal(scene: MemoryPiece[], seed: number, cycle: number) {
-  const pool = scene.flatMap((piece) => lyricSignals(piece.artifact));
+function buildCatalogSignals(
+  artifacts: FloatExperimentArtifact[],
+  seed: number,
+  cycle: number
+): CatalogSignal[] {
+  const sourceWords = uniqueList(
+    artifacts.flatMap((artifact) => [
+      artifact.title,
+      artifact.album,
+      artifact.era,
+      artifact.year,
+      artifact.parent_slug,
+      artifact.artifact_type,
+      artifact.kind,
+      ...(artifact.motifs || []),
+      ...(artifact.atmosphere || []),
+      ...(artifact.rooms || []),
+    ])
+  );
+  const words = sourceWords.length
+    ? sourceWords
+    : ["catalog", "signal", "room", "artifact", "index", "layer"];
+
+  return Array.from({ length: 4 }, (_, rowIndex) => {
+    const rowSeed = seed + cycle * 331 + rowIndex * 89;
+    const parts = Array.from({ length: 8 }, (_, partIndex) => {
+      const word =
+        words[Math.floor(seededUnit(rowSeed + partIndex * 13) * words.length)] ||
+        words[0];
+      const separator = seededUnit(rowSeed + partIndex * 17) > 0.5 ? " / " : " -- ";
+
+      return `${clip(word.toUpperCase(), 22)}${partIndex < 7 ? separator : ""}`;
+    });
+
+    return {
+      seed: rowSeed,
+      text: parts.join(""),
+    };
+  });
+}
+
+function centralSignal(
+  artifacts: FloatExperimentArtifact[],
+  seed: number,
+  cycle: number
+) {
+  const pool = artifacts.flatMap(lyricSignals);
 
   if (pool.length === 0) return null;
 
-  const signal =
-    pool[Math.floor(seededUnit(seed + cycle * 811) * pool.length)] || pool[0];
+  let signalIndex = Math.floor(seededUnit(seed + cycle * 811 + 811) * pool.length);
+
+  if (cycle > 0 && pool.length > 1) {
+    const previousIndex = Math.floor(seededUnit(seed + (cycle - 1) * 811 + 811) * pool.length);
+
+    if (signalIndex === previousIndex) {
+      signalIndex = (signalIndex + 1) % pool.length;
+    }
+  }
+
+  const signal = pool[signalIndex] || pool[0];
 
   return {
     ...signal,
@@ -512,12 +691,12 @@ function TransmissionTextLayer({
   seed: number;
 }) {
   const style = {
-    "--memory-text-blur": `${signal.blur}px`,
-    "--memory-text-left": `${signal.left}%`,
-    "--memory-text-opacity": signal.opacity,
-    "--memory-text-rotate": `${signal.rotate}deg`,
-    "--memory-text-top": `${signal.top}%`,
-    "--memory-text-z": signal.zIndex,
+    "--memory-text-blur": `${fixed(signal.blur)}px`,
+    "--memory-text-left": cssPercent(signal.left),
+    "--memory-text-opacity": cssNumber(signal.opacity),
+    "--memory-text-rotate": cssDegrees(signal.rotate),
+    "--memory-text-top": cssPercent(signal.top),
+    "--memory-text-z": String(signal.zIndex),
   } as CSSProperties;
 
   return (
@@ -540,8 +719,30 @@ function TransmissionTextLayer({
   );
 }
 
+function CatalogSignalStrip({
+  reducedMotion,
+  signals,
+}: {
+  reducedMotion: boolean;
+  signals: CatalogSignal[];
+}) {
+  return (
+    <div className="elsewhere-memory-catalog-strip" aria-hidden>
+      {signals.map((signal, index) => (
+        <MutatingText
+          className="elsewhere-memory-catalog-strip__line"
+          intensity={0.12}
+          key={`${signal.text}-${index}`}
+          reducedMotion={reducedMotion}
+          seed={signal.seed}
+          text={signal.text}
+        />
+      ))}
+    </div>
+  );
+}
+
 function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) {
-  const textures = archiveTextureSet(`${piece.artifact.slug}:${seed}`, 3);
   const treatment =
     piece.treatment === "alive"
       ? {
@@ -564,32 +765,41 @@ function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) 
             contrast: seededRange(seed + 4, 128, 168),
           };
   const style = {
-    "--memory-height": `${piece.height}vh`,
-    "--memory-left": `${piece.left}%`,
-    "--memory-opacity": piece.opacity,
-    "--memory-rotate": `${piece.rotate}deg`,
-    "--memory-top": `${piece.top}%`,
-    "--memory-width": `${piece.width}vw`,
-    "--memory-z": piece.zIndex,
-    "--memory-texture-a": `url(${textures[0]})`,
-    "--memory-texture-b": `url(${textures[1]})`,
-    "--memory-grayscale": `${treatment.grayscale}%`,
-    "--memory-saturate": `${treatment.saturate}%`,
-    "--memory-brightness": `${treatment.brightness}%`,
-    "--memory-contrast": `${treatment.contrast}%`,
-    "--memory-image-rotate": `${piece.imageRotate}deg`,
+    "--memory-height": piece.heightCss,
+    "--memory-grid-align": piece.align,
+    "--memory-grid-column": piece.gridColumn,
+    "--memory-grid-justify": piece.justify,
+    "--memory-grid-row": piece.gridRow,
+    "--memory-left": cssPercent(piece.left),
+    "--memory-opacity": cssNumber(piece.opacity),
+    "--memory-rotate": cssDegrees(piece.rotate),
+    "--memory-top": cssPercent(piece.top),
+    "--memory-width": piece.widthCss,
+    "--memory-z": String(piece.zIndex),
+    "--memory-grayscale": `${fixed(treatment.grayscale)}%`,
+    "--memory-saturate": `${fixed(treatment.saturate)}%`,
+    "--memory-brightness": `${fixed(treatment.brightness)}%`,
+    "--memory-contrast": `${fixed(treatment.contrast)}%`,
+    "--memory-image-rotate": cssDegrees(piece.imageRotate),
   } as CSSProperties;
 
   return (
     <a
       href={`/artifact/${piece.artifact.slug}`}
-      className={`elsewhere-memory-piece group ${piece.isAnchor ? "is-anchor" : ""}`}
+      className={`elsewhere-memory-piece group ${piece.isAnchor ? "is-anchor" : ""} ${piece.isTiny ? "is-tiny" : ""}`}
       style={style}
     >
       <span className="elsewhere-memory-tape" aria-hidden />
       <span className="elsewhere-memory-photo">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={piece.artifact.image_url || ""} alt={piece.artifact.title} />
+        {piece.textureIndices.map((textureIndex, index) => (
+          <span
+            aria-hidden
+            className={`elsewhere-memory-image-texture elsewhere-memory-texture--${textureIndex}`}
+            key={`${textureIndex}-${index}`}
+          />
+        ))}
       </span>
       <span className="elsewhere-memory-label">
         <span>{piece.label}</span>
@@ -604,6 +814,19 @@ function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) 
   );
 }
 
+function AtmosphericTextureLayers() {
+  return (
+    <div className="elsewhere-memory-textures" aria-hidden>
+      {ARCHIVE_TEXTURES.map((texture, index) => (
+        <span
+          className={`elsewhere-memory-atmosphere-texture elsewhere-memory-texture--${index}`}
+          key={texture}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function FloatExperiment({
   artifacts,
   debugMode,
@@ -613,41 +836,146 @@ export default function FloatExperiment({
   debugMode: boolean;
   seed: number;
 }) {
-  const [cycle, setCycle] = useState(0);
+  const [imageCycle, setImageCycle] = useState(0);
+  const [textCycle, setTextCycle] = useState(0);
+  const [centralCycle, setCentralCycle] = useState(0);
+  const [associationTargetTime, setAssociationTargetTime] = useState(0);
+  const [clockNow, setClockNow] = useState(0);
+  const [showIntro, setShowIntro] = useState(true);
   const [quiet, setQuiet] = useState(false);
   const reducedMotion = useReducedMotion();
   const scene = useMemo(
-    () => buildScene(artifacts, seed, cycle),
-    [artifacts, cycle, seed]
+    () => buildScene(artifacts, seed, imageCycle),
+    [artifacts, imageCycle, seed]
   );
   const anchor = scene[0];
   const transmissionText = useMemo(
-    () => buildTransmissionText(scene, artifacts, seed, cycle),
-    [artifacts, cycle, scene, seed]
+    () => buildTransmissionText(scene, artifacts, seed, textCycle),
+    [artifacts, scene, seed, textCycle]
   );
-  const central = useMemo(() => centralSignal(scene, seed, cycle), [cycle, scene, seed]);
+  const catalogSignals = useMemo(
+    () => buildCatalogSignals(artifacts, seed, textCycle),
+    [artifacts, seed, textCycle]
+  );
+  const central = useMemo(
+    () => centralSignal(artifacts, seed, centralCycle),
+    [artifacts, centralCycle, seed]
+  );
+  const associationCountdownMs = associationTargetTime && clockNow
+    ? Math.max(0, Math.floor(associationTargetTime - clockNow))
+    : 0;
+  const associationCountdown = `${String(Math.floor(associationCountdownMs / 1000)).padStart(
+    2,
+    "0"
+  )}.${String(associationCountdownMs % 1000).padStart(3, "0")}`;
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowIntro(false), 3_800);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(Date.now()), 33);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (reducedMotion) return;
-    if (quiet && !ELSEWHERE_FLOAT_INTENSITY_V2) return;
-    const timer = window.setInterval(() => {
-      setCycle((current) => current + 1);
-    }, quiet ? 7_800 : ELSEWHERE_FLOAT_INTENSITY_V2 ? 4_800 : 18_000);
-    return () => window.clearInterval(timer);
-  }, [quiet, reducedMotion]);
+    let cancelled = false;
+    let timer = 0;
+    let step = 0;
+
+    const schedule = () => {
+      const delay = quiet
+        ? seededRange(seed + step * 31 + 5, 9_000, 15_000)
+        : seededRange(seed + step * 31 + 5, 5_800, 12_400);
+      setAssociationTargetTime(Date.now() + delay);
+
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        setImageCycle((current) => current + 1);
+        step += 1;
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [quiet, reducedMotion, seed]);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    let cancelled = false;
+    let timer = 0;
+    let step = 0;
+
+    const schedule = () => {
+      const delay = quiet
+        ? seededRange(seed + step * 43 + 17, 4_400, 8_800)
+        : seededRange(seed + step * 43 + 17, 1_700, 5_600);
+
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        setTextCycle((current) => current + 1);
+        step += 1;
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [quiet, reducedMotion, seed]);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    let cancelled = false;
+    let timer = 0;
+    let step = 0;
+
+    const schedule = () => {
+      const delay = seededRange(seed + step * 59 + 29, 6_000, 15_000);
+
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        setCentralCycle((current) => current + 1);
+        step += 1;
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [quiet, reducedMotion, seed]);
 
   return (
     <main className={`elsewhere-memory-stage min-h-screen overflow-hidden bg-[#070604] text-stone-200 ${ELSEWHERE_FLOAT_INTENSITY_V2 ? "elsewhere-memory-stage--intensity-v2" : ""}`}>
       <div className="elsewhere-memory-ground" aria-hidden />
+      <AtmosphericTextureLayers />
       {ELSEWHERE_FLOAT_INTENSITY_V2 && (
         <>
           <div className="elsewhere-memory-broadcast" aria-hidden />
+          <CatalogSignalStrip
+            reducedMotion={reducedMotion}
+            signals={catalogSignals}
+          />
           <div className="elsewhere-memory-text-field" aria-hidden>
             {transmissionText.map((signal, index) => (
               <TransmissionTextLayer
-                key={`${signal.text}-${cycle}-${index}`}
+                key={`${signal.text}-${textCycle}-${index}`}
                 reducedMotion={reducedMotion}
-                seed={seed + cycle * 1009 + index * 61}
+                seed={seed + textCycle * 1009 + index * 61}
                 signal={signal}
               />
             ))}
@@ -655,10 +983,10 @@ export default function FloatExperiment({
           {central && (
             <div className="elsewhere-memory-central" aria-hidden>
               <MutatingText
-                className="elsewhere-memory-central__text"
+                className="elsewhere-memory-central__text elsewhere-memory-central__text--machine elsewhere-memory-central__text--contained"
                 intensity={0.16}
                 reducedMotion={reducedMotion}
-                seed={seed + cycle * 701}
+                seed={seed + centralCycle * 701}
                 text={central.text}
               />
             </div>
@@ -667,14 +995,18 @@ export default function FloatExperiment({
       )}
       <section className="relative z-20 flex min-h-screen flex-col px-5 py-5 md:px-8">
         <header className="flex items-start justify-between gap-5">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.48em] text-stone-600">
-              Elsewhere / float experiment
-            </p>
-            <h1 className="mt-3 font-serif text-4xl text-stone-100 md:text-6xl">
-              The archive is thinking.
-            </h1>
-          </div>
+          {showIntro ? (
+            <div className="elsewhere-memory-intro">
+              <p className="text-[10px] uppercase tracking-[0.48em] text-stone-600">
+                Elsewhere / float experiment
+              </p>
+              <h1 className="mt-3 font-serif text-4xl text-stone-100 md:text-6xl">
+                The archive is thinking.
+              </h1>
+            </div>
+          ) : (
+            <div aria-hidden />
+          )}
           <Link
             href="/"
             className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.34em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
@@ -686,15 +1018,18 @@ export default function FloatExperiment({
         <div className="elsewhere-memory-table relative mt-6 flex-1">
           {scene.map((piece, index) => (
             <MemoryPieceCard
-              key={`${piece.artifact.id}-${cycle}-${index}`}
+              key={`${piece.artifact.id}-${imageCycle}-${index}`}
               piece={piece}
-              seed={seed + cycle * 37 + index * 11}
+              seed={seed + imageCycle * 37 + index * 11}
             />
           ))}
           {anchor && (
-            <aside className="elsewhere-memory-caption">
+            <aside className="elsewhere-memory-caption elsewhere-memory-caption--bare">
               <p>current association</p>
               <h2>{anchor.artifact.title}</h2>
+              <p className="elsewhere-memory-caption__countdown elsewhere-memory-caption__countdown--stopwatch">
+                {associationCountdown}
+              </p>
               <span>
                 {anchor.artifact.fragment ||
                   anchor.artifact.description ||
@@ -721,7 +1056,12 @@ export default function FloatExperiment({
             <button
               type="button"
               className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.3em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
-              onClick={() => setCycle((current) => current + 1)}
+              onClick={() => {
+                setImageCycle((current) => current + 1);
+                setAssociationTargetTime(Date.now());
+                setTextCycle((current) => current + 1);
+                setCentralCycle((current) => current + 1);
+              }}
             >
               Remember Again
             </button>
