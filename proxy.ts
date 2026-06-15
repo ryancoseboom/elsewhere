@@ -4,14 +4,15 @@ export function proxy(request: NextRequest) {
   const basicAuth = request.headers.get("authorization");
 
   if (request.nextUrl.pathname.startsWith("/backroom")) {
+    if (request.nextUrl.pathname === "/backroom/login") {
+      return NextResponse.next();
+    }
+
     if (request.nextUrl.pathname === "/backroom/logout") {
-      const response = new NextResponse("Backroom access closed.", {
-        status: 401,
-        headers: {
-          "Cache-Control": "no-store",
-          "WWW-Authenticate": 'Basic realm="Backroom"',
-        },
-      });
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/backroom/login";
+      loginUrl.search = "?loggedOut=1";
+      const response = NextResponse.redirect(loginUrl);
       response.cookies.set("elsewhere_backroom", "", {
         httpOnly: true,
         maxAge: 0,
@@ -19,6 +20,10 @@ export function proxy(request: NextRequest) {
         sameSite: "lax",
       });
       return response;
+    }
+
+    if (request.cookies.get("elsewhere_backroom")?.value === "yes") {
+      return NextResponse.next();
     }
 
     if (basicAuth?.startsWith("Basic ")) {
@@ -40,16 +45,18 @@ export function proxy(request: NextRequest) {
           return response;
         }
       } catch {
-        // Fall through to the authentication challenge.
+        // Fall through to the in-site login.
       }
     }
 
-    return new NextResponse("Authentication required.", {
-      status: 401,
-      headers: {
-        "WWW-Authenticate": 'Basic realm="Backroom"',
-      },
-    });
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/backroom/login";
+    loginUrl.searchParams.set(
+      "next",
+      `${request.nextUrl.pathname}${request.nextUrl.search}`
+    );
+
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();

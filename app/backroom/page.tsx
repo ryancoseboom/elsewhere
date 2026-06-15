@@ -15,6 +15,14 @@ type Artifact = {
   created_at: string;
 };
 
+type BackroomSearchParams = Promise<{
+  access?: string | string[];
+}>;
+
+function one(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function ArtifactTree({
   parent,
   items,
@@ -101,7 +109,12 @@ function ArtifactTree({
   );
 }
 
-export default async function BackroomPage() {
+export default async function BackroomPage({
+  searchParams,
+}: {
+  searchParams: BackroomSearchParams;
+}) {
+  const accessAccepted = one((await searchParams).access) === "accepted";
   const supabase = await createClient();
 
   const { data: artifacts, error } = await supabase
@@ -159,6 +172,11 @@ const orphanArtifacts = items.filter(
               Objects, fragments, songs, photographs, and half-lit memories
               before they find their way into the rooms.
             </p>
+            {accessAccepted && (
+              <p className="mt-6 w-fit border-l border-emerald-800 bg-emerald-950/15 px-4 py-3 text-sm leading-6 text-emerald-300">
+                Credentials accepted. Backroom access is open.
+              </p>
+            )}
           </div>
 
           <Link
