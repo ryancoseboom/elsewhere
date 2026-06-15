@@ -1582,17 +1582,17 @@ button:hover > .elsewhere-archive-texture {
 
 .elsewhere-memory-central__text {
   display: block;
-  max-width: 150vw;
-  color: rgba(245, 245, 244, 0.28);
+  max-width: 190vw;
+  color: rgba(245, 245, 244, 0.34);
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(7rem, 24vw, 26rem);
+  font-size: clamp(13rem, 42vw, 46rem);
   font-weight: 400;
-  line-height: 0.68;
+  line-height: 0.56;
   text-align: center;
   text-transform: uppercase;
   text-wrap: balance;
-  transform: rotate(-3deg) scaleX(1.12);
-  animation: elsewhere-memory-central-interrupt 7.4s steps(2, end) infinite;
+  transform: rotate(-3deg) scaleX(1.26);
+  animation: elsewhere-memory-central-interrupt 4.8s steps(2, end) infinite;
 }
 
 .elsewhere-memory-ground {
@@ -1641,9 +1641,7 @@ button:hover > .elsewhere-archive-texture {
   overflow: hidden;
   display: block;
   background: #0c0a08;
-  box-shadow:
-    0 0 0 1px rgba(231, 229, 228, 0.08),
-    0 18px 48px rgba(0, 0, 0, 0.62);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.62);
   -webkit-mask-image:
     radial-gradient(ellipse at center, #000 58%, rgba(0, 0, 0, 0.86) 78%, transparent 100%),
     var(--memory-texture-a);
@@ -1667,6 +1665,7 @@ button:hover > .elsewhere-archive-texture {
     contrast(var(--memory-contrast, 112%))
     brightness(var(--memory-brightness, 78%))
     saturate(var(--memory-saturate, 82%));
+  transform: rotate(var(--memory-image-rotate, 0deg)) scale(1.01);
   transition:
     filter 900ms ease,
     transform 900ms ease;
@@ -1691,9 +1690,13 @@ button:hover > .elsewhere-archive-texture {
 }
 
 .elsewhere-memory-photo::after {
-  background:
-    linear-gradient(to right, rgba(0, 0, 0, 0.58), transparent 13%, transparent 88%, rgba(0, 0, 0, 0.5)),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.52), transparent 14%, transparent 86%, rgba(0, 0, 0, 0.56));
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08),
+    transparent 28%,
+    transparent 72%,
+    rgba(0, 0, 0, 0.22)
+  );
   mix-blend-mode: multiply;
 }
 
@@ -1703,7 +1706,7 @@ button:hover > .elsewhere-archive-texture {
 
 .elsewhere-memory-piece:hover .elsewhere-memory-photo img {
   filter: grayscale(0%) contrast(106%) brightness(96%) saturate(118%);
-  transform: scale(1.025);
+  transform: rotate(var(--memory-image-rotate, 0deg)) scale(1.035);
 }
 
 .elsewhere-memory-tape {

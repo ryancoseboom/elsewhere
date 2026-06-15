@@ -38,6 +38,7 @@ export type FloatExperimentArtifact = {
 type MemoryPiece = {
   artifact: FloatExperimentArtifact;
   height: number;
+  imageRotate: number;
   isAnchor: boolean;
   label: string;
   left: number;
@@ -181,6 +182,14 @@ function sourceSignals(artifact: FloatExperimentArtifact) {
   );
 
   return signals;
+}
+
+function lyricSignals(artifact: FloatExperimentArtifact) {
+  return textFragments(artifact.lyrics, 8).map((text) => ({
+    reason: "lyric memory interrupting the center signal",
+    source: artifact.title,
+    text,
+  }));
 }
 
 function titleWords(artifact: FloatExperimentArtifact) {
@@ -341,6 +350,7 @@ function buildScene(
     const piece: MemoryPiece = {
       artifact: item.artifact,
       height: Math.max(9, slot.height + seededRange(itemSeed + 1, -3.5, 4.5)),
+      imageRotate: seededUnit(itemSeed + 11) > 0.84 ? 180 : 0,
       isAnchor: index === 0,
       label:
         index === 0
@@ -355,9 +365,9 @@ function buildScene(
       rotate: seededRange(itemSeed + 4, -5.2, 5.2),
       top: Math.max(2, Math.min(84, slot.top + seededRange(itemSeed + 5, -3.5, 3.5))),
       treatment:
-        seededUnit(itemSeed + 9) < 0.58
+        seededUnit(itemSeed + 9) < 0.76
           ? "alive"
-          : seededUnit(itemSeed + 9) < 0.84
+          : seededUnit(itemSeed + 9) < 0.94
             ? "faded"
             : "ghost",
       width: Math.max(9, slot.width + seededRange(itemSeed + 6, -2.5, 3.5)),
@@ -424,14 +434,16 @@ function buildTransmissionText(
 }
 
 function centralSignal(scene: MemoryPiece[], seed: number, cycle: number) {
-  const pool = scene.flatMap((piece) => sourceSignals(piece.artifact));
+  const pool = scene.flatMap((piece) => lyricSignals(piece.artifact));
+
+  if (pool.length === 0) return null;
+
   const signal =
-    pool[Math.floor(seededUnit(seed + cycle * 811) * Math.max(1, pool.length))] ||
-    { reason: "fallback central interruption", source: "system", text: "STAY WITH THE SIGNAL" };
+    pool[Math.floor(seededUnit(seed + cycle * 811) * pool.length)] || pool[0];
 
   return {
     ...signal,
-    text: clip(signal.text.toUpperCase(), 42),
+    text: clip(signal.text.toUpperCase(), 34),
   };
 }
 
@@ -533,22 +545,22 @@ function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) 
   const treatment =
     piece.treatment === "alive"
       ? {
-          grayscale: seededRange(seed + 1, 0, 14),
-          saturate: seededRange(seed + 2, 96, 132),
-          brightness: seededRange(seed + 3, 82, 104),
-          contrast: seededRange(seed + 4, 102, 122),
+          grayscale: seededRange(seed + 1, 0, 4),
+          saturate: seededRange(seed + 2, 132, 190),
+          brightness: seededRange(seed + 3, 96, 118),
+          contrast: seededRange(seed + 4, 104, 128),
         }
       : piece.treatment === "faded"
         ? {
-            grayscale: seededRange(seed + 1, 24, 48),
-            saturate: seededRange(seed + 2, 62, 86),
-            brightness: seededRange(seed + 3, 74, 92),
-            contrast: seededRange(seed + 4, 98, 118),
+            grayscale: seededRange(seed + 1, 8, 24),
+            saturate: seededRange(seed + 2, 92, 126),
+            brightness: seededRange(seed + 3, 86, 106),
+            contrast: seededRange(seed + 4, 100, 120),
           }
         : {
             grayscale: seededRange(seed + 1, 78, 100),
-            saturate: seededRange(seed + 2, 20, 54),
-            brightness: seededRange(seed + 3, 58, 78),
+            saturate: seededRange(seed + 2, 34, 70),
+            brightness: seededRange(seed + 3, 62, 84),
             contrast: seededRange(seed + 4, 128, 168),
           };
   const style = {
@@ -565,6 +577,7 @@ function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) 
     "--memory-saturate": `${treatment.saturate}%`,
     "--memory-brightness": `${treatment.brightness}%`,
     "--memory-contrast": `${treatment.contrast}%`,
+    "--memory-image-rotate": `${piece.imageRotate}deg`,
   } as CSSProperties;
 
   return (
@@ -619,7 +632,7 @@ export default function FloatExperiment({
     if (quiet && !ELSEWHERE_FLOAT_INTENSITY_V2) return;
     const timer = window.setInterval(() => {
       setCycle((current) => current + 1);
-    }, quiet ? 9_800 : ELSEWHERE_FLOAT_INTENSITY_V2 ? 7_400 : 18_000);
+    }, quiet ? 7_800 : ELSEWHERE_FLOAT_INTENSITY_V2 ? 4_800 : 18_000);
     return () => window.clearInterval(timer);
   }, [quiet, reducedMotion]);
 
@@ -639,15 +652,17 @@ export default function FloatExperiment({
               />
             ))}
           </div>
-          <div className="elsewhere-memory-central" aria-hidden>
-            <MutatingText
-              className="elsewhere-memory-central__text"
-              intensity={0.16}
-              reducedMotion={reducedMotion}
-              seed={seed + cycle * 701}
-              text={central.text}
-            />
-          </div>
+          {central && (
+            <div className="elsewhere-memory-central" aria-hidden>
+              <MutatingText
+                className="elsewhere-memory-central__text"
+                intensity={0.16}
+                reducedMotion={reducedMotion}
+                seed={seed + cycle * 701}
+                text={central.text}
+              />
+            </div>
+          )}
         </>
       )}
       <section className="relative z-20 flex min-h-screen flex-col px-5 py-5 md:px-8">
@@ -738,11 +753,11 @@ export default function FloatExperiment({
                 </p>
                 <p className="mt-2 text-xs leading-5 text-stone-500">
                   <span className="text-stone-600">Image treatment:</span>{" "}
-                  {piece.treatment}
+                  {piece.treatment}; image rotation {piece.imageRotate}deg
                 </p>
               </article>
             ))}
-            {ELSEWHERE_FLOAT_INTENSITY_V2 && (
+            {ELSEWHERE_FLOAT_INTENSITY_V2 && central && (
               <article className="border-t border-stone-800 pt-3">
                 <h3 className="font-serif text-base text-stone-200">
                   Central interruption
