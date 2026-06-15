@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import SourceInterference from "@/components/SourceInterference";
 import { createClient } from "@/lib/supabase/server";
 
 type Artifact = {
@@ -34,6 +35,7 @@ export default async function MotifPage({
     .from("artifacts")
     .select("id, slug, title, kind, fragment, description, motifs, atmosphere, image_url")
     .eq("is_public", true)
+    .eq("discovery_visibility", "public")
     .not("motifs", "is", null)
     .order("created_at", { ascending: false });
 
@@ -76,6 +78,11 @@ export default async function MotifPage({
             A quiet recurrence. Things that do not explain each other, but seem
             to recognize each other in the dark.
           </p>
+          <SourceInterference
+            className="mt-7"
+            context={{ motif: title }}
+            limit={2}
+          />
         </header>
 
         <section className="grid gap-5 md:grid-cols-2">

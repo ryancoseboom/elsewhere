@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import SourceInterference from "@/components/SourceInterference";
 import { createClient } from "@/lib/supabase/server";
 
 type Artifact = {
@@ -29,6 +30,7 @@ export default async function AtmospherePage({
     .from("artifacts")
     .select("id, slug, title, artifact_type, kind, fragment, atmosphere, image_url")
     .eq("is_public", true)
+    .eq("discovery_visibility", "public")
     .not("atmosphere", "is", null)
     .order("created_at", { ascending: false });
 
@@ -63,6 +65,11 @@ export default async function AtmospherePage({
           <h1 className="mt-4 font-serif text-6xl capitalize leading-none text-stone-100 md:text-9xl">
             {slug.replaceAll("-", " ")}
           </h1>
+          <SourceInterference
+            className="mt-7"
+            context={{ atmosphere: [slug.replaceAll("-", " ")] }}
+            limit={2}
+          />
         </header>
 
         <section className="mt-8 grid gap-px bg-stone-800 sm:grid-cols-2 lg:grid-cols-3">

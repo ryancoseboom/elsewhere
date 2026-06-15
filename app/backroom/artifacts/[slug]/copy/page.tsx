@@ -5,6 +5,7 @@ import crypto from "crypto";
 import TitleSlugFields from "@/components/TitleSlugFields";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
 import { spotifyUrl } from "@/lib/spotify";
+import { artifactVisibility } from "@/lib/artifact-visibility";
 
 type Artifact = {
   id: string;
@@ -30,6 +31,7 @@ type Artifact = {
   youtube_url: string | null;
   spotify_url: string | null;
   private_notes: string | null;
+  discovery_visibility: string | null;
   lyrics: string | null;
   album: string | null;
   year: string | null;
@@ -251,6 +253,9 @@ async function createCopiedArtifact(formData: FormData) {
     year: String(formData.get("year") || "").trim(),
     era: String(formData.get("era") || "").trim(),
     is_public: formData.get("is_public") === "yes",
+    discovery_visibility: artifactVisibility(
+      formData.get("discovery_visibility")
+    ),
   });
 
   if (error) throw new Error(error.message);
@@ -334,7 +339,7 @@ export default async function CopyArtifactPage({
   const { data: artifact, error } = await supabase
     .from("artifacts")
     .select(
-      "id, slug, title, parent_slug, kind, artifact_type, parent_id, band_id, album_id, song_id, sort_order, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, private_notes, lyrics, album, year, era, is_public"
+      "id, slug, title, parent_slug, kind, artifact_type, parent_id, band_id, album_id, song_id, sort_order, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, private_notes, discovery_visibility, lyrics, album, year, era, is_public"
     )
     .eq("slug", slug)
     .single();
@@ -411,6 +416,21 @@ export default async function CopyArtifactPage({
             />
             Publish this copied artifact
           </label>
+
+          <section className="space-y-3 border border-stone-800 bg-stone-950/60 p-6">
+            <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+              Discovery visibility
+            </label>
+            <select
+              name="discovery_visibility"
+              defaultValue={item.discovery_visibility || "public"}
+              className="w-full border border-stone-800 bg-neutral-950 px-4 py-3 text-stone-200 outline-none focus:border-stone-400"
+            >
+              <option value="public">Public surfaces</option>
+              <option value="hidden">Hidden / drift discoverable</option>
+              <option value="backroom">Backroom only</option>
+            </select>
+          </section>
 
           <section className="space-y-6 border border-stone-800 bg-stone-950/60 p-6">
             <div>

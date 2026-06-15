@@ -183,10 +183,24 @@ const orphanArtifacts = items.filter(
           </Link>
 
           <Link
+            href="/backroom/research-candidates"
+            className="inline-flex w-fit rounded-full border border-stone-600 px-6 py-3 text-xs uppercase tracking-[0.25em] text-stone-200 hover:bg-stone-200 hover:text-neutral-950 transition"
+          >
+            Source interference
+          </Link>
+
+          <Link
             href="/backroom/media-labels"
             className="inline-flex w-fit rounded-full border border-stone-600 px-6 py-3 text-xs uppercase tracking-[0.25em] text-stone-200 hover:bg-stone-200 hover:text-neutral-950 transition"
           >
             Rewrite media labels
+          </Link>
+
+          <Link
+            href="/backroom/moods"
+            className="inline-flex w-fit rounded-full border border-stone-600 px-6 py-3 text-xs uppercase tracking-[0.25em] text-stone-200 hover:bg-stone-200 hover:text-neutral-950 transition"
+          >
+            Assign song moods
           </Link>
 
           <Link

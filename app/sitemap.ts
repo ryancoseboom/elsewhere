@@ -8,7 +8,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const { data, error } = await supabase
     .from("artifacts")
     .select("slug")
-    .eq("is_public", true);
+    .eq("is_public", true)
+    .eq("discovery_visibility", "public");
 
   if (error) throw new Error(error.message);
 

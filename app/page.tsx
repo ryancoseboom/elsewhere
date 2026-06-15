@@ -34,6 +34,7 @@ export default async function Home() {
     .from("artifacts")
     .select("slug, title, image_url")
     .eq("is_public", true)
+    .eq("discovery_visibility", "public")
     .not("image_url", "is", null)
     .limit(120);
   const backdrop = shuffle(

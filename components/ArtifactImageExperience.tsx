@@ -18,8 +18,14 @@ import { spotifyUrl as normalizeSpotifyUrl } from "@/lib/spotify";
 type ExperienceImage = {
   src: string;
   alt: string;
+  atmosphere?: string[];
   category?: string;
+  era?: string | null;
+  fragment?: string | null;
+  lyrics?: string | null;
+  motifs?: string[];
   slug?: string;
+  year?: string | null;
 };
 
 type LightboxState = {
@@ -38,6 +44,44 @@ type RecordingDimensions = {
   height: number;
   label: string;
   width: number;
+};
+
+type FloatVariant = "classic" | "sleeve";
+
+type FloatSleevePiece = {
+  designRule: string;
+  imageTreatment: string;
+  image: ExperienceImage;
+  moodReason: string;
+  placementLogic: string;
+  reason: string;
+  slot: (typeof floatSleeveSlots)[number];
+  slotIndex: number;
+};
+
+type FloatSleeveTextFragment = {
+  className: string;
+  designRule: string;
+  id: string;
+  label: string;
+  reason: string;
+  text: string;
+};
+
+type FloatSleeveLyricFragment = {
+  id: string;
+  line: string;
+  reason: string;
+  source: string;
+};
+
+type FloatSleeveBurst = {
+  colorIndex: number | null;
+  colorReason: string;
+  lyricIndex: number | null;
+  motionIndex: number | null;
+  motionReason: string;
+  textIndex: number | null;
 };
 
 type SaveFilePickerWindow = Window & {
@@ -63,6 +107,163 @@ const recordingDimensions: RecordingDimensions[] = [
 ];
 const floatTextures = ARCHIVE_TEXTURES;
 const floatTextureCount = 7;
+const floatSleeveSlots = [
+  {
+    align: "left",
+    accent: "#b91c1c",
+    area: "plate",
+    className: "elsewhere-float-sleeve-piece--plate",
+    designRule: "dominant evidence plate holds the composition",
+    gridColumn: "2 / span 5",
+    gridRow: "2 / span 5",
+    imageFit: "cover",
+    placementLogic: "large left column, offset from center to preserve negative space",
+  },
+  {
+    align: "right",
+    accent: "#d97706",
+    area: "index",
+    className: "elsewhere-float-sleeve-piece--index",
+    designRule: "secondary fragment balances the plate without matching it",
+    gridColumn: "8 / span 3",
+    gridRow: "2 / span 3",
+    imageFit: "cover",
+    placementLogic: "upper-right index position, aligned to the outer grid",
+  },
+  {
+    align: "right",
+    accent: "#0f766e",
+    area: "strip",
+    className: "elsewhere-float-sleeve-piece--strip",
+    designRule: "narrow vertical rhythm replaces scattered debris",
+    gridColumn: "11 / span 1",
+    gridRow: "3 / span 5",
+    imageFit: "cover",
+    placementLogic: "thin right-hand strip, like a catalog spine or test print",
+  },
+  {
+    align: "left",
+    accent: "#a16207",
+    area: "caption",
+    className: "elsewhere-float-sleeve-piece--caption",
+    designRule: "small supporting proof sits below the main plate",
+    gridColumn: "4 / span 3",
+    gridRow: "7 / span 2",
+    imageFit: "cover",
+    placementLogic: "lower-left supporting block, locked to the plate baseline",
+  },
+  {
+    align: "right",
+    accent: "#dc2626",
+    area: "stamp",
+    className: "elsewhere-float-sleeve-piece--stamp",
+    designRule: "rare color appears as a registration mark, not a palette",
+    gridColumn: "8 / span 2",
+    gridRow: "6 / span 2",
+    imageFit: "cover",
+    placementLogic: "small lower-right stamp with controlled red accent",
+  },
+  {
+    align: "left",
+    accent: "#2563eb",
+    area: "microfiche",
+    className: "elsewhere-float-sleeve-piece--microfiche",
+    designRule: "tiny archival trace leaves the quiet areas intact",
+    gridColumn: "2 / span 2",
+    gridRow: "8 / span 1",
+    imageFit: "cover",
+    placementLogic: "small footer trace, subordinate to type and space",
+  },
+  {
+    align: "left",
+    accent: "#7c3aed",
+    area: "signal",
+    className: "elsewhere-float-sleeve-piece--signal",
+    designRule: "small color flare interrupts the monochrome field",
+    gridColumn: "7 / span 1",
+    gridRow: "2 / span 2",
+    imageFit: "cover",
+    placementLogic: "narrow signal block between the main plate and index column",
+  },
+  {
+    align: "right",
+    accent: "#be123c",
+    area: "wash",
+    className: "elsewhere-float-sleeve-piece--wash",
+    designRule: "translucent color wash adds drama without filling the page",
+    gridColumn: "9 / span 2",
+    gridRow: "8 / span 2",
+    imageFit: "cover",
+    placementLogic: "low right wash, below the primary reading path",
+  },
+  {
+    align: "left",
+    accent: "#65a30d",
+    area: "marker",
+    className: "elsewhere-float-sleeve-piece--marker",
+    designRule: "tiny marker pins the grid like a catalog sticker",
+    gridColumn: "7 / span 1",
+    gridRow: "6 / span 1",
+    imageFit: "cover",
+    placementLogic: "single-cell marker between image clusters",
+  },
+  {
+    align: "right",
+    accent: "#0891b2",
+    area: "remnant",
+    className: "elsewhere-float-sleeve-piece--remnant",
+    designRule: "small remnant increases density while preserving negative space",
+    gridColumn: "11 / span 1",
+    gridRow: "8 / span 1",
+    imageFit: "cover",
+    placementLogic: "lower-right remnant aligned to the strip column",
+  },
+] as const;
+
+const unstableFloatCaptions = [
+  "catalogue plate / private evidence",
+  "index unstable / please refile",
+  "image sequence not final",
+  "archive copy / color leak",
+  "transmission holds, then slips",
+  "record sleeve / damaged proof",
+];
+
+const floatSleeveTextSlots = [
+  {
+    className: "elsewhere-float-sleeve-note--small",
+    designRule: "small catalog note keeps the page archival rather than decorative",
+    label: "accession",
+  },
+  {
+    className: "elsewhere-float-sleeve-note--catalog",
+    designRule: "sparse label text pins the composition to the grid",
+    label: "catalog",
+  },
+  {
+    className: "elsewhere-float-sleeve-note--dominant",
+    designRule: "dominant typography becomes a graphic sleeve element",
+    label: "graphic",
+  },
+  {
+    className: "elsewhere-float-sleeve-note--side",
+    designRule: "rotated side text behaves like a spine or proof mark",
+    label: "spine",
+  },
+  {
+    className: "elsewhere-float-sleeve-note--quiet",
+    designRule: "quiet field note appears in negative space",
+    label: "field",
+  },
+] as const;
+
+const fallbackLyricFragments = [
+  "overheard line / source pending",
+  "unfiled voice fragment",
+  "memory caught on the insert",
+  "caption awaiting transcript",
+  "field note, not yet verified",
+];
 
 function seededUnit(seed: number) {
   const value = Math.sin(seed * 9187.17) * 10000;
@@ -93,6 +294,204 @@ function selectFloatTextures(seed: number) {
       return leftScore - rightScore;
     })
     .slice(0, floatTextureCount);
+}
+
+function uniqueStrings(items: (string | null | undefined)[]) {
+  return [
+    ...new Set(
+      items
+        .filter(Boolean)
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+    ),
+  ];
+}
+
+function imageTerms(image: ExperienceImage) {
+  return [
+    image.category,
+    image.year,
+    image.era,
+    ...(image.motifs || []),
+    ...(image.atmosphere || []),
+  ].filter(Boolean) as string[];
+}
+
+function relationReason(image: ExperienceImage, anchor?: ExperienceImage) {
+  if (!anchor || image.src === anchor.src) {
+    return "selected as the sleeve's central evidence";
+  }
+
+  const anchorTerms = new Set(
+    imageTerms(anchor).map((term) => term.toLowerCase())
+  );
+  const shared = imageTerms(image).filter((term) =>
+    anchorTerms.has(term.toLowerCase())
+  );
+
+  if (shared.length > 0) {
+    return `shares ${shared.slice(0, 3).join(" / ")} with the central plate`;
+  }
+
+  if (image.category) {
+    return `${image.category} broadens the archival set without crowding it`;
+  }
+
+  return "kept as a quiet visual echo rather than a metadata match";
+}
+
+function moodReason(image: ExperienceImage) {
+  const motifs = uniqueStrings(image.motifs || []).slice(0, 2);
+  const atmosphere = uniqueStrings(image.atmosphere || []).slice(0, 2);
+
+  if (motifs.length && atmosphere.length) {
+    return `motif ${motifs.join(" / ")} against mood ${atmosphere.join(" / ")}`;
+  }
+
+  if (motifs.length) return `motif: ${motifs.join(" / ")}`;
+  if (atmosphere.length) return `mood: ${atmosphere.join(" / ")}`;
+  if (image.fragment) return "fragment text suggests the association";
+
+  return "no mood metadata; placement carries the association";
+}
+
+function imageTreatmentFor(slotIndex: number, image: ExperienceImage) {
+  if (slotIndex === 0) return "flat monochrome photographic plate";
+  if (["stamp", "signal", "wash", "marker"].includes(floatSleeveSlots[slotIndex]?.area || "")) {
+    return "flat print with rare color leak";
+  }
+  if (image.category?.toLowerCase().includes("artwork")) {
+    return "printed sleeve clipping, low-gloss";
+  }
+
+  return "flat photocopy/transparency treatment";
+}
+
+function buildFloatSleevePieces(
+  images: ExperienceImage[],
+  seed: number,
+  initialImageSlug?: string
+): FloatSleevePiece[] {
+  if (images.length === 0) return [];
+
+  const bySource = new Map(images.map((image) => [image.src, image]));
+  const uniqueImages = [...bySource.values()];
+  const preferredImage =
+    (initialImageSlug
+      ? uniqueImages.find((image) => image.slug === initialImageSlug)
+      : undefined) || uniqueImages[0];
+  const selected: ExperienceImage[] = [preferredImage];
+  const usedCategories = new Set(
+    [preferredImage.category].filter(Boolean) as string[]
+  );
+
+  const candidates = uniqueImages
+    .filter((image) => image.src !== preferredImage.src)
+    .map((image, index) => {
+      const categoryBonus =
+        image.category && !usedCategories.has(image.category) ? 18 : 0;
+      const metadataBonus = imageTerms(image).length * 3;
+      const titleRhythm = image.alt.length % 11;
+      const seededScore = seededRange(seed + index * 19 + image.alt.length, 0, 12);
+
+      return {
+        image,
+        score: categoryBonus + metadataBonus + titleRhythm + seededScore,
+      };
+    })
+    .sort((left, right) => right.score - left.score);
+
+  candidates.forEach(({ image }) => {
+    if (selected.length >= floatSleeveSlots.length) return;
+    selected.push(image);
+    if (image.category) usedCategories.add(image.category);
+  });
+
+  return selected.map((image, index) => {
+    const slot = floatSleeveSlots[index];
+    const anchor = selected[0];
+
+    return {
+      designRule: slot.designRule,
+      imageTreatment: imageTreatmentFor(index, image),
+      image,
+      moodReason: moodReason(image),
+      placementLogic: slot.placementLogic,
+      reason:
+        index === 0
+          ? initialImageSlug
+            ? "opened from the requested image on the artifact page"
+            : "first available artifact image becomes the central plate"
+          : relationReason(image, anchor),
+      slot,
+      slotIndex: index,
+    };
+  });
+}
+
+function lyricLinesFromImages(images: ExperienceImage[]): FloatSleeveLyricFragment[] {
+  const realLines = images.flatMap((image) =>
+    (image.lyrics || "")
+      .split(/\n+/)
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter((line) => line.length > 18 && line.length < 96)
+      .slice(0, 4)
+      .map((line, index) => ({
+        id: `${image.slug || image.alt}-${index}`,
+        line,
+        reason: "real lyric data attached to an artifact image",
+        source: image.alt,
+      }))
+  );
+
+  if (realLines.length > 0) return realLines;
+
+  return fallbackLyricFragments.map((line, index) => ({
+    id: `placeholder-lyric-${index}`,
+    line,
+    reason: "placeholder lyric fragment until artifact lyrics are wired here",
+    source: "placeholder",
+  }));
+}
+
+function buildFloatSleeveTextFragments(
+  pieces: FloatSleevePiece[],
+  sleeveTextIndex: number
+): FloatSleeveTextFragment[] {
+  const anchor = pieces[0]?.image;
+  const vocabulary = uniqueStrings([
+    anchor?.alt,
+    anchor?.fragment,
+    anchor?.category,
+    anchor?.year,
+    anchor?.era,
+    ...(anchor?.motifs || []),
+    ...(anchor?.atmosphere || []),
+    ...pieces.slice(1, 6).map((piece) => piece.slot.area),
+    ...pieces.slice(1, 5).map((piece) => piece.image.alt),
+  ]);
+
+  return floatSleeveTextSlots.map((slot, index) => {
+    const fallback = `${slot.label} / ${String(index + 1).padStart(2, "0")}`;
+    const source =
+      vocabulary[(sleeveTextIndex + index * 2) % Math.max(1, vocabulary.length)] ||
+      fallback;
+    const detail =
+      vocabulary[(sleeveTextIndex + index * 2 + 1) % Math.max(1, vocabulary.length)] ||
+      "unfiled";
+
+    return {
+      className: slot.className,
+      designRule: slot.designRule,
+      id: `${slot.label}-${index}`,
+      label: slot.label,
+      reason: `drawn from ${anchor?.alt || "the current sleeve"} metadata`,
+      text:
+        index === 2
+          ? source
+          : `${slot.label} / ${source}${index % 2 === 0 ? ` / ${detail}` : ""}`,
+    };
+  });
 }
 
 function clusteredSwapDelay(seed: number, minimum: number, maximum: number) {
@@ -135,6 +534,13 @@ export function ArtifactImageButton({
   src,
   alt,
   category,
+  era,
+  fragment,
+  lyrics,
+  motifs,
+  slug,
+  year,
+  atmosphere,
   alwaysColor = false,
   className = "",
   imageClassName = "",
@@ -151,7 +557,18 @@ export function ArtifactImageButton({
       onClick={() => {
         window.dispatchEvent(
           new CustomEvent<ExperienceImage>(openImageEvent, {
-            detail: { src, alt, category },
+            detail: {
+              src,
+              alt,
+              atmosphere,
+              category,
+              era,
+              fragment,
+              lyrics,
+              motifs,
+              slug,
+              year,
+            },
           })
         );
       }}
@@ -539,6 +956,203 @@ function FloatImageFragment({
   );
 }
 
+function FloatSleevePieceView({
+  colorBurstActive,
+  motionBurstActive,
+  onOpen,
+  piece,
+  seed,
+  textures,
+}: {
+  colorBurstActive: boolean;
+  motionBurstActive: boolean;
+  onOpen: (image: ExperienceImage) => void;
+  piece: FloatSleevePiece;
+  seed: number;
+  textures: string[];
+}) {
+  const texture = textures[Math.floor(seededUnit(seed + piece.slotIndex * 13) * textures.length)];
+  const rotation = seededRange(seed + piece.slotIndex * 17, -0.9, 0.9).toFixed(2);
+  const delay = `${(piece.slotIndex * 620 + seededRange(seed + piece.slotIndex, 0, 320)).toFixed(0)}ms`;
+  const driftX = `${seededRange(seed + piece.slotIndex * 23, -0.75, 0.75).toFixed(2)}rem`;
+  const driftY = `${seededRange(seed + piece.slotIndex * 29, -0.6, 0.6).toFixed(2)}rem`;
+  const motionDuration = `${seededRange(seed + piece.slotIndex * 31, 11, 22).toFixed(2)}s`;
+  const panX = `${seededRange(seed + piece.slotIndex * 37, -2.8, 2.8).toFixed(2)}%`;
+  const panY = `${seededRange(seed + piece.slotIndex * 41, -2.2, 2.2).toFixed(2)}%`;
+  const panScale = seededRange(seed + piece.slotIndex * 43, 1.025, 1.08).toFixed(3);
+  const labelKey = `${piece.image.alt}:${piece.slot.area}:${Math.round(seed)}`;
+
+  return (
+    <button
+      type="button"
+      className={`elsewhere-float-sleeve-piece ${piece.slot.className} ${
+        motionBurstActive ? "is-motion-burst" : ""
+      } ${colorBurstActive ? "is-color-burst" : ""}`}
+      style={{
+        "--float-sleeve-delay": delay,
+        "--float-sleeve-fit": piece.slot.imageFit,
+        "--float-sleeve-rotation": `${rotation}deg`,
+        "--float-sleeve-accent": piece.slot.accent,
+        "--float-sleeve-drift-x": driftX,
+        "--float-sleeve-drift-y": driftY,
+        "--float-sleeve-motion-delay": `${-seededRange(seed + piece.slotIndex * 47, 0, 8).toFixed(2)}s`,
+        "--float-sleeve-motion-duration": motionDuration,
+        "--float-sleeve-pan-delay": `${-seededRange(seed + piece.slotIndex * 53, 0, 10).toFixed(2)}s`,
+        "--float-sleeve-pan-duration": `${seededRange(seed + piece.slotIndex * 59, 14, 28).toFixed(2)}s`,
+        "--float-sleeve-pan-scale": panScale,
+        "--float-sleeve-pan-x": panX,
+        "--float-sleeve-pan-y": panY,
+        "--float-sleeve-pulse-duration": `${seededRange(seed + piece.slotIndex * 61, 5.5, 12).toFixed(2)}s`,
+        "--float-sleeve-texture": `url(${texture})`,
+        gridColumn: piece.slot.gridColumn,
+        gridRow: piece.slot.gridRow,
+      } as CSSProperties}
+      onClick={() => onOpen(piece.image)}
+    >
+      <span className="elsewhere-float-sleeve-photo">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={piece.image.src} alt={piece.image.alt} />
+      </span>
+      <span className="elsewhere-float-sleeve-label">
+        <span>{String(piece.slotIndex + 1).padStart(2, "0")}</span>
+        <strong>
+          <span>{piece.image.alt}</span>
+          <span>
+            {uniqueStrings([
+              piece.slot.area,
+              piece.image.category,
+              piece.image.year,
+              piece.image.era,
+            ])
+              .slice(0, 3)
+              .join(" / ") || labelKey}
+          </span>
+        </strong>
+        <small>
+          {uniqueStrings([
+            piece.image.category,
+            piece.image.year,
+            piece.image.era,
+            ...(piece.image.motifs || []),
+          ])
+            .slice(0, 3)
+            .join(" / ")}
+        </small>
+      </span>
+    </button>
+  );
+}
+
+function FloatSleeveNote({
+  active,
+  fragment,
+}: {
+  active: boolean;
+  fragment: FloatSleeveTextFragment;
+}) {
+  return (
+    <span
+      className={`elsewhere-float-sleeve-note ${fragment.className} ${
+        active ? "is-active" : ""
+      }`}
+    >
+      {fragment.text}
+    </span>
+  );
+}
+
+function FloatSleeveLyric({
+  fragment,
+}: {
+  fragment: FloatSleeveLyricFragment | null;
+}) {
+  if (!fragment) return null;
+
+  return (
+    <span key={fragment.id} className="elsewhere-float-sleeve-lyric">
+      {fragment.line}
+    </span>
+  );
+}
+
+function FloatSleeveDebug({
+  burst,
+  lyric,
+  pieces,
+  textFragments,
+}: {
+  burst: FloatSleeveBurst;
+  lyric: FloatSleeveLyricFragment | null;
+  pieces: FloatSleevePiece[];
+  textFragments: FloatSleeveTextFragment[];
+}) {
+  return (
+    <aside className="elsewhere-float-sleeve-debug">
+      <p className="text-[10px] uppercase tracking-[0.34em] text-stone-500">
+        Float debug / sleeve system
+      </p>
+      <div className="mt-4 border-t border-stone-800 pt-3 text-xs leading-5 text-stone-400">
+        <p>
+          <span className="text-stone-500">Active text:</span>{" "}
+          {burst.textIndex === null
+            ? "none"
+            : textFragments[burst.textIndex]?.text || "unknown"}
+        </p>
+        <p className="mt-2">
+          <span className="text-stone-500">Active lyric:</span>{" "}
+          {lyric ? `${lyric.line} (${lyric.source})` : "none"}
+        </p>
+        <p className="mt-2">
+          <span className="text-stone-500">Motion burst:</span>{" "}
+          {burst.motionIndex === null
+            ? "none"
+            : `${pieces[burst.motionIndex]?.image.alt || "unknown"} / ${burst.motionReason}`}
+        </p>
+        <p className="mt-2">
+          <span className="text-stone-500">Color burst:</span>{" "}
+          {burst.colorIndex === null
+            ? "none"
+            : `${pieces[burst.colorIndex]?.image.alt || "unknown"} / ${burst.colorReason}`}
+        </p>
+      </div>
+      <div className="mt-4 space-y-4">
+        {pieces.map((piece) => (
+          <article
+            key={`${piece.image.src}-${piece.slotIndex}`}
+            className="border-t border-stone-800 pt-3"
+          >
+            <h3 className="font-serif text-base text-stone-200">
+              {piece.image.alt}
+            </h3>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.24em] text-stone-600">
+              slot {piece.slotIndex + 1} / {piece.slot.area}
+            </p>
+            <p className="mt-3 text-xs leading-5 text-stone-400">
+              <span className="text-stone-500">Selected:</span> {piece.reason}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-stone-400">
+              <span className="text-stone-500">Placement:</span>{" "}
+              {piece.placementLogic}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-stone-500">
+              <span className="text-stone-600">Mood / motif:</span>{" "}
+              {piece.moodReason}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-stone-500">
+              <span className="text-stone-600">Design rule:</span>{" "}
+              {piece.designRule}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-stone-500">
+              <span className="text-stone-600">Image treatment:</span>{" "}
+              {piece.imageTreatment}
+            </p>
+          </article>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 export default function ArtifactImageExperience({
   autoLaunch = false,
   images,
@@ -557,6 +1171,16 @@ export default function ArtifactImageExperience({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const searchParamString = searchParams.toString();
+  const floatVariantParam = searchParams.get("float");
+  const floatDebugParam = searchParams.get("floatDebug") || searchParams.get("debugFloat");
+  const configuredFloatVariant = process.env.NEXT_PUBLIC_FLOAT_VARIANT;
+  const floatVariant: FloatVariant =
+    floatVariantParam === "classic" || configuredFloatVariant === "classic"
+      ? "classic"
+      : "sleeve";
+  const floatDebugMode =
+    floatVariant === "sleeve" &&
+    ["1", "true", "debug", "float"].includes(floatDebugParam || "");
   const routeKey = `${pathname}?${searchParamString}`;
   const [lightboxState, setLightboxState] = useState<LightboxState | null>(
     () => {
@@ -579,6 +1203,15 @@ export default function ArtifactImageExperience({
     null
   );
   const [recordingName, setRecordingName] = useState("elsewhere-float");
+  const [sleeveTextIndex, setSleeveTextIndex] = useState(0);
+  const [sleeveBurst, setSleeveBurst] = useState<FloatSleeveBurst>({
+    colorIndex: null,
+    colorReason: "no color burst active",
+    lyricIndex: null,
+    motionIndex: null,
+    motionReason: "no motion burst active",
+    textIndex: null,
+  });
   const [pageHidden, setPageHidden] = useState(false);
   const lightboxOpen = Boolean(lightboxImage);
   const floatRef = useRef<HTMLDivElement>(null);
@@ -775,6 +1408,16 @@ export default function ArtifactImageExperience({
     return () => document.removeEventListener("visibilitychange", updateVisibility);
   }, []);
 
+  useEffect(() => {
+    if (!floating || floatVariant !== "sleeve" || recording) return;
+
+    const timer = window.setInterval(() => {
+      setSleeveTextIndex((current) => current + 1);
+    }, 3200);
+
+    return () => window.clearInterval(timer);
+  }, [floatVariant, floating, recording]);
+
   function moveFloat(event: PointerEvent<HTMLDivElement>) {
     const x = (event.clientX / window.innerWidth - 0.5) * 2;
     const y = (event.clientY / window.innerHeight - 0.5) * 2;
@@ -792,6 +1435,95 @@ export default function ArtifactImageExperience({
     () => selectFloatTextures(floatSeed),
     [floatSeed]
   );
+  const sleevePieces = useMemo(
+    () => buildFloatSleevePieces(images, floatSeed, initialImageSlug),
+    [floatSeed, images, initialImageSlug]
+  );
+  const sleeveTextFragments = useMemo(
+    () => buildFloatSleeveTextFragments(sleevePieces, sleeveTextIndex),
+    [sleevePieces, sleeveTextIndex]
+  );
+  const sleeveLyricFragments = useMemo(() => lyricLinesFromImages(images), [images]);
+  const activeLyric =
+    sleeveBurst.lyricIndex === null
+      ? null
+      : sleeveLyricFragments[sleeveBurst.lyricIndex % sleeveLyricFragments.length] ||
+        null;
+  useEffect(() => {
+    if (!floating || floatVariant !== "sleeve" || recording) return;
+
+    let clearTimer = 0;
+    const timer = window.setInterval(() => {
+      const pieceCount = Math.max(1, sleevePieces.length);
+      const textCount = Math.max(1, sleeveTextFragments.length);
+      const lyricCount = Math.max(1, sleeveLyricFragments.length);
+      const eventSeed = floatSeed + Date.now() / 97;
+      const motionIndex = Math.floor(seededUnit(eventSeed + 1) * pieceCount);
+      const colorIndex = Math.floor(seededUnit(eventSeed + 3) * pieceCount);
+      const lyricIndex = Math.floor(seededUnit(eventSeed + 5) * lyricCount);
+      const textIndex =
+        seededUnit(eventSeed + 6) > 0.18
+          ? Math.floor(seededUnit(eventSeed + 7) * textCount)
+          : null;
+
+      setSleeveBurst({
+        colorIndex,
+        colorReason: "brief print accident / label-color shock",
+        lyricIndex,
+        motionIndex,
+        motionReason: "intermittent archive twitch, not constant drift",
+        textIndex,
+      });
+
+      window.clearTimeout(clearTimer);
+      clearTimer = window.setTimeout(() => {
+        setSleeveBurst((current) => ({
+          ...current,
+          colorIndex: null,
+          colorReason: "color burst faded back into monochrome",
+          lyricIndex: null,
+          motionIndex: null,
+          motionReason: "motion burst has settled",
+          textIndex: null,
+        }));
+      }, seededRange(eventSeed + 8, 1200, 2600));
+    }, 5600);
+
+    return () => {
+      window.clearInterval(timer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [
+    floatSeed,
+    floatVariant,
+    floating,
+    recording,
+    sleeveLyricFragments.length,
+    sleevePieces.length,
+    sleeveTextFragments.length,
+  ]);
+  const unstableFloatText = useMemo(() => {
+    const anchor = sleevePieces[0]?.image;
+    const titles = uniqueStrings([
+      anchor?.alt,
+      anchor?.fragment,
+      ...(anchor?.motifs || []),
+      ...(anchor?.atmosphere || []),
+      ...sleevePieces.slice(1, 5).map((piece) => piece.image.alt),
+    ]);
+    const title = titles[sleeveTextIndex % Math.max(1, titles.length)] || "Float";
+    const caption =
+      unstableFloatCaptions[
+        (sleeveTextIndex + Math.floor(seededUnit(floatSeed + sleeveTextIndex) * unstableFloatCaptions.length)) %
+          unstableFloatCaptions.length
+      ];
+
+    return {
+      caption,
+      eyebrow: sleeveTextIndex % 3 === 1 ? "Elsewhere / unstable index" : "Elsewhere / Float",
+      title,
+    };
+  }, [floatSeed, sleevePieces, sleeveTextIndex]);
   const streamUrl = spotifyUrl ? normalizeSpotifyUrl(spotifyUrl) : "";
   const tiles =
     images.length > 0
@@ -1142,13 +1874,99 @@ export default function ArtifactImageExperience({
                 >
                   View original ↗
                 </a>
+                {lightboxImage.slug && (
+                  <a
+                    href={`/artifact/${lightboxImage.slug}`}
+                    className="border border-stone-700 px-2 py-1 text-stone-300 transition hover:border-stone-300 hover:text-white"
+                  >
+                    Open artifact
+                  </a>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {floating && (
+      {floating && floatVariant === "sleeve" && !recording && (
+        <div
+          ref={floatRef}
+          className={`elsewhere-float-sleeve-stage fixed inset-0 z-[80] overflow-hidden bg-[#050505] ${
+            pageHidden ? "elsewhere-float-paused" : ""
+          }`}
+        >
+          <div className="elsewhere-float-sleeve-ground absolute inset-0" />
+          <div className="elsewhere-float-sleeve-grid absolute inset-0">
+            {sleevePieces.map((piece) => (
+              <FloatSleevePieceView
+                key={`${piece.image.src}-${piece.slotIndex}`}
+                colorBurstActive={sleeveBurst.colorIndex === piece.slotIndex}
+                motionBurstActive={sleeveBurst.motionIndex === piece.slotIndex}
+                onOpen={(image) => setLightboxState({ image, routeKey })}
+                piece={piece}
+                seed={floatSeed + piece.slotIndex * 53}
+                textures={sessionTextures}
+              />
+            ))}
+          </div>
+          <div className="elsewhere-float-sleeve-notes absolute inset-0">
+            {sleeveTextFragments.map((fragment, index) => (
+              <FloatSleeveNote
+                key={fragment.id}
+                active={sleeveBurst.textIndex === index}
+                fragment={fragment}
+              />
+            ))}
+          </div>
+          <FloatSleeveLyric fragment={activeLyric} />
+          <div className="elsewhere-float-sleeve-type absolute">
+            <p>{unstableFloatText.eyebrow}</p>
+            <h2 key={`float-title-${sleeveTextIndex}`}>
+              {unstableFloatText.title}
+            </h2>
+            <span key={`float-caption-${sleeveTextIndex}`}>
+              {unstableFloatText.caption}
+            </span>
+          </div>
+          <div className="elsewhere-float-sleeve-index absolute">
+            {sleevePieces.map((piece) => (
+              <span key={`${piece.image.src}-index`}>
+                {String(piece.slotIndex + 1).padStart(2, "0")}{" "}
+                {piece.image.category || "fragment"}
+              </span>
+            ))}
+          </div>
+          <div aria-hidden className="elsewhere-float-sleeve-overlay absolute inset-0" />
+          <div className="absolute left-5 top-5 z-30 text-[10px] uppercase tracking-[0.42em] text-stone-500">
+            Float / archival sleeve
+          </div>
+          <button
+            type="button"
+            className="absolute right-5 top-5 z-30 border border-stone-700 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-stone-300 transition hover:border-stone-400 hover:text-white"
+            onClick={() => setFloating(false)}
+          >
+            Return
+          </button>
+          {returnHref && (
+            <a
+              href={returnHref}
+              className="absolute right-5 top-16 z-30 border border-stone-800 bg-black/45 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
+            >
+              Exit Page
+            </a>
+          )}
+          {floatDebugMode && (
+            <FloatSleeveDebug
+              burst={sleeveBurst}
+              lyric={activeLyric}
+              pieces={sleevePieces}
+              textFragments={sleeveTextFragments}
+            />
+          )}
+        </div>
+      )}
+
+      {floating && (floatVariant === "classic" || recording) && (
         <div
           ref={floatRef}
           className={`elsewhere-float-stage fixed inset-0 z-[80] overflow-hidden bg-black ${

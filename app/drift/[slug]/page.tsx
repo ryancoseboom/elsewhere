@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ArchiveBranch from "@/components/ArchiveBranch";
+import SourceInterference from "@/components/SourceInterference";
+import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
 import { createClient } from "@/lib/supabase/server";
 import {
   artifactType,
@@ -28,6 +30,33 @@ type BackdropTile = {
   imageUrl: string;
   residue: boolean;
 };
+
+function lyricFragments(lyrics?: string | null) {
+  const lines = (lyrics || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 8);
+
+  if (lines.length === 0) return [];
+
+  return lines
+    .map((line, index) => {
+      const words = line.split(/\s+/).filter(Boolean);
+      const seed = Array.from(line).reduce(
+        (total, char) => total + char.charCodeAt(0),
+        index * 17
+      );
+      const start = words.length > 5 ? seed % Math.max(1, words.length - 4) : 0;
+      const length = Math.min(words.length - start, 3 + (seed % 4));
+      const fragment = words.slice(start, start + length).join(" ");
+
+      return `${start > 0 ? "... " : ""}${fragment}${
+        start + length < words.length ? " ..." : ""
+      }`;
+    })
+    .filter(Boolean)
+    .slice(0, 5);
+}
 
 function isImageOnlyArtifact(artifact: ArchiveArtifact) {
   return ["Artwork", "Design", "Photo"].includes(artifactType(artifact));
@@ -156,9 +185,18 @@ function chooseDirections(
   artifacts: ArchiveArtifact[],
   trail: string[]
 ) {
-  const candidates = artifacts.filter(
+  const revealHidden = shouldRevealHiddenDirection(current, trail);
+  const publicCandidates = artifacts.filter(
     (artifact) => artifact.id !== current.id && !trail.includes(artifact.slug)
   );
+  const candidates = publicCandidates.filter(
+    (artifact) => artifact.discovery_visibility !== "hidden"
+  );
+  const hiddenCandidates = revealHidden
+    ? publicCandidates.filter(
+        (artifact) => artifact.discovery_visibility === "hidden"
+      )
+    : [];
   const possibilities = shuffle(
     candidates.flatMap((artifact) =>
       driftReadings(current, artifact).map((reading) => ({ artifact, reading }))
@@ -187,7 +225,39 @@ function chooseDirections(
     }
   });
 
+  if (hiddenCandidates.length > 0 && chosen.length > 0) {
+    const hiddenPossibility = shuffle(
+      hiddenCandidates.flatMap((artifact) =>
+        driftReadings(current, artifact).map((reading) => ({
+          artifact,
+          reading: {
+            ...reading,
+            prompt:
+              reading.key === "chance"
+                ? "Open a misfiled passage"
+                : reading.prompt,
+          },
+        }))
+      )
+    )[0];
+
+    if (hiddenPossibility) {
+      chosen[chosen.length - 1] = hiddenPossibility;
+    }
+  }
+
   return chosen;
+}
+
+function shouldRevealHiddenDirection(current: ArchiveArtifact, trail: string[]) {
+  if (current.discovery_visibility === "hidden") return true;
+
+  const seed = [...current.slug, ...trail.join("")].reduce(
+    (total, char, index) => total + char.charCodeAt(0) * (index + 5),
+    0
+  );
+
+  return seed % 5 === 0;
 }
 
 function signalPreview(artifact: ArchiveArtifact): SignalPreview | null {
@@ -276,9 +346,10 @@ export default async function DriftArtifactPage({
   const { data, error } = await supabase
     .from("artifacts")
     .select(
-      "id, slug, title, kind, artifact_type, parent_id, parent_slug, band_id, album_id, song_id, year, atmosphere, motifs, image_url, audio_url, video_url, youtube_url, lyrics, fragment, description, drift_weight"
+      "id, slug, title, kind, artifact_type, parent_id, parent_slug, band_id, album_id, song_id, year, atmosphere, motifs, image_url, audio_url, video_url, youtube_url, spotify_url, lyrics, fragment, description, drift_weight, discovery_visibility"
     )
-    .eq("is_public", true);
+    .eq("is_public", true)
+    .in("discovery_visibility", ["public", "hidden"]);
 
   if (error) throw new Error(error.message);
 
@@ -286,6 +357,9 @@ export default async function DriftArtifactPage({
     ...artifact,
     kind: artifact.artifact_type || artifact.kind,
   })) as ArchiveArtifact[];
+  const ordinaryArtifacts = artifacts.filter(
+    (artifact) => artifact.discovery_visibility !== "hidden"
+  );
   const current = artifacts.find((artifact) => artifact.slug === slug);
 
   if (!current) notFound();
@@ -310,17 +384,22 @@ export default async function DriftArtifactPage({
         .filter((fragment): fragment is string => Boolean(fragment))
     ),
   ].slice(-2);
-  const attachedArtifacts = artifacts.filter((artifact) =>
+  const previewPool =
+    current.discovery_visibility === "hidden" ? artifacts : ordinaryArtifacts;
+  const attachedArtifacts = previewPool.filter((artifact) =>
     isAttachedTo(current, artifact)
   );
-  const currentPreview = representativePreview(current, artifacts);
+  const currentPreview = representativePreview(current, previewPool);
   const directionPreviews = candidates
     .map(({ artifact, reading }, index) => ({
       artifact,
       reading,
       color: DRIFT_DIRECTION_COLORS[index],
       number: index + 1,
-      preview: representativePreview(artifact, artifacts),
+      preview: representativePreview(
+        artifact,
+        artifact.discovery_visibility === "hidden" ? artifacts : ordinaryArtifacts
+      ),
     }))
     .filter(
       (direction): direction is typeof direction & { preview: SignalPreview } =>
@@ -329,7 +408,9 @@ export default async function DriftArtifactPage({
   const audioPreviews = shuffle([current, ...attachedArtifacts])
     .filter((artifact) => artifact.audio_url?.trim())
     .slice(0, 2);
-  const backdrop = uniqueBackdrop(residueArtifacts, artifacts);
+  const currentIsSong = artifactType(current) === "Song";
+  const currentLyricFragments = currentIsSong ? lyricFragments(current.lyrics) : [];
+  const backdrop = uniqueBackdrop(residueArtifacts, ordinaryArtifacts);
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#090807] px-6 py-8 text-stone-200">
@@ -376,11 +457,42 @@ export default async function DriftArtifactPage({
         <div className="grid flex-1 items-center gap-12 py-12 lg:grid-cols-[minmax(0,1fr)_28rem]">
           <section>
             <p className="text-[10px] uppercase tracking-[0.44em] text-stone-400">
-              Drift / {artifactType(current) || "signal"}
+              Drift / {current.discovery_visibility === "hidden" ? "misfiled" : artifactType(current) || "signal"}
             </p>
             <h1 className="mt-5 max-w-4xl font-serif text-6xl leading-none text-stone-100 md:text-8xl">
               {current.title}
             </h1>
+            {currentIsSong && (
+              <div className="mt-7 max-w-xl space-y-4">
+                {current.spotify_url && (
+                  <>
+                    <SpotifyTrackEmbed
+                      title={current.title}
+                      url={current.spotify_url}
+                      className="border border-stone-800 bg-black/50"
+                    />
+                  </>
+                )}
+                <div className="flex flex-wrap gap-3">
+                  {current.spotify_url && (
+                    <a
+                      href={current.spotify_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex border border-stone-700 bg-black/50 px-4 py-3 text-[10px] uppercase tracking-[0.24em] text-stone-300 transition hover:border-stone-300 hover:text-white"
+                    >
+                      Open Spotify
+                    </a>
+                  )}
+                  <Link
+                    href={artifactOpenHref(current)}
+                    className="inline-flex border border-stone-700 bg-black/50 px-4 py-3 text-[10px] uppercase tracking-[0.24em] text-stone-300 transition hover:border-stone-300 hover:text-white"
+                  >
+                    Open artifact page
+                  </Link>
+                </div>
+              </div>
+            )}
             {current.fragment && (
               <p className="mt-7 max-w-2xl font-serif text-2xl italic leading-9 text-stone-300">
                 “{current.fragment}”
@@ -391,6 +503,30 @@ export default async function DriftArtifactPage({
                 {current.description}
               </p>
             )}
+            {currentLyricFragments.length > 0 && (
+              <div className="mt-7 grid max-w-2xl gap-2 border-l border-stone-700/70 pl-4">
+                <p className="mb-1 text-[9px] uppercase tracking-[0.32em] text-stone-500">
+                  lyric residue
+                </p>
+                {currentLyricFragments.map((fragment, index) => (
+                  <p
+                    key={`${fragment}-${index}`}
+                    className="font-serif text-sm italic leading-6 text-stone-400"
+                  >
+                    {fragment}
+                  </p>
+                ))}
+              </div>
+            )}
+            <SourceInterference
+              className="mt-8 max-w-2xl"
+              context={{
+                artifactSlug: current.slug,
+                atmosphere: current.atmosphere || [],
+                motifs: current.motifs || [],
+              }}
+              limit={3}
+            />
             {(currentPreview || directionPreviews.length > 0 || audioPreviews.length > 0) && (
               <div className="mt-9 max-w-2xl border-t border-stone-700/80 pt-5">
                 <p className="text-[9px] uppercase tracking-[0.34em] text-stone-500">

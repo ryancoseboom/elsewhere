@@ -2,6 +2,7 @@ export type ArchiveArtifact = {
   album_id: string | null;
   atmosphere: string[] | null;
   audio_url?: string | null;
+  discovery_visibility?: string | null;
   band_id: string | null;
   description: string | null;
   drift_weight?: number | null;
@@ -15,6 +16,7 @@ export type ArchiveArtifact = {
   parent_slug: string | null;
   slug: string;
   song_id: string | null;
+  spotify_url?: string | null;
   title: string;
   video_url?: string | null;
   year: string | null;

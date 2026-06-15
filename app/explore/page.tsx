@@ -81,7 +81,8 @@ export default async function ExplorePage() {
     .select(
       "id, slug, title, kind, artifact_type, parent_id, parent_slug, band_id, album_id, song_id, year, atmosphere, motifs, image_url, fragment, description"
     )
-    .eq("is_public", true);
+    .eq("is_public", true)
+    .eq("discovery_visibility", "public");
 
   if (error) throw new Error(error.message);
 

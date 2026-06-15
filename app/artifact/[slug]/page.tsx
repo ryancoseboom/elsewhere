@@ -26,7 +26,10 @@ import {
 } from "@/components/ArtifactEphemeraBrowser";
 import ArtifactPageNav from "@/components/ArtifactPageNav";
 import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
+import SourceInterference from "@/components/SourceInterference";
 import { archiveTexture, archiveTextureSet } from "@/lib/archive-textures";
+
+const ELSEWHERE_ATMOSPHERE_V2 = true;
 
 type Artifact = {
   id: string;
@@ -50,6 +53,7 @@ type Artifact = {
   video_url: string | null;
   youtube_url: string | null;
   spotify_url: string | null;
+  discovery_visibility: string | null;
   album: string | null;
   year: string | null;
   era: string | null;
@@ -63,6 +67,21 @@ function normalizeList(items: string[] | null) {
 
 function getArtifactType(artifact: Artifact) {
   return artifact.artifact_type || artifact.kind || "";
+}
+
+function artifactFloatImage(artifact: Artifact) {
+  return {
+    atmosphere: artifact.atmosphere || undefined,
+    category: getArtifactType(artifact) || undefined,
+    era: artifact.era,
+    fragment: artifact.fragment,
+    lyrics: artifact.lyrics,
+    motifs: artifact.motifs || undefined,
+    slug: artifact.slug,
+    src: artifact.image_url || "",
+    alt: artifact.title,
+    year: artifact.year,
+  };
 }
 
 function isImageOnlyArtifact(artifact: Artifact) {
@@ -119,6 +138,15 @@ function sharedThreads(current: Artifact, candidate: Artifact) {
   return [...(current.motifs || []), ...(current.atmosphere || [])].filter(
     (thread) => candidateThreads.has(thread.toLowerCase().trim())
   );
+}
+
+function shouldRevealHiddenArtifact(slug: string) {
+  const score = Array.from(slug).reduce(
+    (total, char, index) => total + char.charCodeAt(0) * (index + 3),
+    0
+  );
+
+  return score % 11 === 0;
 }
 
 function ChildLinkList({
@@ -845,7 +873,11 @@ function VideoGallery({
   );
 }
 
-function RelatedGrid({ items }: { items: (Artifact & { shared?: string[] })[] }) {
+function RelatedGrid({
+  items,
+}: {
+  items: (Artifact & { hiddenDiscovery?: boolean; shared?: string[] })[];
+}) {
   if (items.length === 0) return null;
 
   return (
@@ -860,12 +892,12 @@ function RelatedGrid({ items }: { items: (Artifact & { shared?: string[] })[] })
             href={`/artifact/${item.slug}`}
             className="bg-neutral-950 p-4 transition hover:bg-stone-900"
           >
-            <p className="font-serif text-lg text-stone-300">{item.title}</p>
-            {(item.shared || []).length > 0 && (
-              <p className="mt-2 text-[9px] uppercase tracking-[0.18em] text-stone-700">
-                {(item.shared || []).slice(0, 3).join(" / ")}
+            {item.hiddenDiscovery && (
+              <p className="mb-3 text-[9px] uppercase tracking-[0.24em] text-red-900">
+                misfiled signal
               </p>
             )}
+            <p className="font-serif text-lg text-stone-300">{item.title}</p>
             {item.fragment && (
               <p className="mt-2 line-clamp-2 text-xs italic leading-5 text-stone-600">
                 {item.fragment}
@@ -875,6 +907,91 @@ function RelatedGrid({ items }: { items: (Artifact & { shared?: string[] })[] })
         ))}
       </div>
     </section>
+  );
+}
+
+function artifactDossierCode(artifact: Artifact) {
+  const titleSeed = artifact.title
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 4)
+    .padEnd(4, "X");
+  const checksum = Array.from(artifact.slug).reduce(
+    (total, char) => total + char.charCodeAt(0),
+    0
+  );
+
+  return `EL-${titleSeed}-${String(checksum % 997).padStart(3, "0")}`;
+}
+
+function ArtifactDossierLayer({
+  artifact,
+  presentationType,
+  imageCount,
+  trackCount,
+  documentCount,
+}: {
+  artifact: Artifact;
+  presentationType: string;
+  imageCount: number;
+  trackCount: number;
+  documentCount: number;
+}) {
+  const code = artifactDossierCode(artifact);
+  const dateLine = [artifact.year, artifact.era].filter(Boolean).join(" / ");
+  const inventory = [
+    imageCount ? `${imageCount} visual refs` : null,
+    trackCount ? `${trackCount} tracks` : null,
+    documentCount ? `${documentCount} paper traces` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="elsewhere-artifact-dossier-layer" aria-hidden="true">
+      <span className="elsewhere-artifact-dossier-mark elsewhere-artifact-dossier-mark--code">
+        {code}
+      </span>
+      <span className="elsewhere-artifact-dossier-mark elsewhere-artifact-dossier-mark--status">
+        public copy / indexed
+      </span>
+      <span className="elsewhere-artifact-dossier-mark elsewhere-artifact-dossier-mark--type">
+        {presentationType}
+      </span>
+      {dateLine && (
+        <span className="elsewhere-artifact-dossier-mark elsewhere-artifact-dossier-mark--date">
+          {dateLine}
+        </span>
+      )}
+      {inventory.length > 0 && (
+        <span className="elsewhere-artifact-dossier-mark elsewhere-artifact-dossier-mark--inventory">
+          {inventory.join(" / ")}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ArtifactDossierNote({
+  artifact,
+  imageCount,
+  trackCount,
+}: {
+  artifact: Artifact;
+  imageCount: number;
+  trackCount: number;
+}) {
+  const code = artifactDossierCode(artifact);
+  const year = artifact.year || artifact.era || "undated";
+  const measures = [
+    trackCount ? `${trackCount} track index` : null,
+    imageCount ? `${imageCount} visual refs` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="elsewhere-artifact-dossier-note" aria-hidden="true">
+      <span>{code}</span>
+      <span>{year}</span>
+      {measures.length > 0 && <span>{measures.join(" / ")}</span>}
+    </div>
   );
 }
 
@@ -902,7 +1019,7 @@ function EditorialDossier({
   const visualItems = [...artwork, ...miscellaneous].slice(0, 4);
   const floatImages = visualItems
     .filter((item) => item.image_url)
-    .map((item) => ({ src: item.image_url || "", alt: item.title }));
+    .map(artifactFloatImage);
 
   return (
     <main className="min-h-screen bg-[#0b0a09] px-6 py-10 text-stone-200">
@@ -1078,25 +1195,14 @@ function VisualScrapbook({
   const floatImages = visualItems
     .filter((item) => item.image_url)
     .map((item) => ({
-      src: item.image_url || "",
-      alt: item.title,
+      ...artifactFloatImage(item),
       category: getEphemeraPane(item),
-      slug: item.slug,
     }));
   const visualSlotCount = canEdit
     ? Math.max(4, visualItems.length + 1)
     : visualItems.length;
+  const documentCount = documents.length;
   const isSongPage = getArtifactType(artifact) === "Song";
-  const threads = [
-    ...(artifact.atmosphere || []).map((label) => ({
-      href: `/atmosphere/${encodeURIComponent(label.toLowerCase().replaceAll(" ", "-"))}`,
-      label,
-    })),
-    ...(artifact.motifs || []).map((label) => ({
-      href: `/motif/${encodeURIComponent(label.toLowerCase().replaceAll(" ", "-"))}`,
-      label,
-    })),
-  ];
   const ephemeraPanes = EPHEMERA_PANES.map((pane) => ({
     count: visualItems.filter((item) => getEphemeraPane(item) === pane).length,
     id: ephemeraPaneId(pane),
@@ -1113,7 +1219,6 @@ function VisualScrapbook({
     ...(ephemeraPanes.length > 0
       ? [{ href: "#ephemera", label: "Ephemera" }]
       : []),
-    ...(threads.length > 0 ? [{ href: "#threads", label: "Threads" }] : []),
     ...(primaryLyrics ? [{ href: "#words", label: "Words" }] : []),
   ];
   const summary = [
@@ -1123,24 +1228,100 @@ function VisualScrapbook({
     ...(floatImages.length > 0
       ? [`${floatImages.length} ${floatImages.length === 1 ? "image" : "images"}`]
       : []),
-    ...(threads.length > 0
-      ? [`${threads.length} ${threads.length === 1 ? "thread" : "threads"}`]
-      : []),
   ];
 
   return (
-    <main id="artifact-top" className="min-h-screen scroll-mt-24 bg-[#11100e] px-5 py-8 text-stone-200">
+    <main
+      id="artifact-top"
+      className={`min-h-screen scroll-mt-24 bg-[#11100e] px-5 py-8 text-stone-200 ${
+        ELSEWHERE_ATMOSPHERE_V2 ? "elsewhere-artifact-atmosphere-v2" : ""
+      }`}
+    >
       <div className="mx-auto max-w-7xl">
+        {ELSEWHERE_ATMOSPHERE_V2 && (
+          <ArtifactDossierLayer
+            artifact={artifact}
+            presentationType={presentationType}
+            imageCount={floatImages.length}
+            trackCount={albumTrackPreviews.length}
+            documentCount={documentCount}
+          />
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-5">
           <Breadcrumbs crumbs={breadcrumbs} />
           {canEdit && <ArchiveTools artifact={artifact} />}
         </div>
 
-        <ArtifactPageNav items={navItems} summary={summary} title={artifact.title} />
+        {ELSEWHERE_ATMOSPHERE_V2 ? (
+          <div className="hidden md:block">
+            <ArtifactPageNav items={navItems} summary={summary} title={artifact.title} />
+          </div>
+        ) : (
+          <ArtifactPageNav items={navItems} summary={summary} title={artifact.title} />
+        )}
 
-        <div id="overview" className="mt-10 grid scroll-mt-24 gap-8 lg:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)]">
-          <aside id="listen-watch" className="scroll-mt-24">
-            {(coverImageUrl || canEdit) && <div className="border border-stone-700 bg-black p-3">
+        {ELSEWHERE_ATMOSPHERE_V2 && (
+          <header className="elsewhere-artifact-mobile-dossier mt-10 lg:hidden">
+            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
+              elsewhere / {presentationType}
+            </p>
+            <h1 className="mt-4 font-serif text-6xl leading-none text-stone-100 sm:text-7xl">
+              {artifact.title}
+            </h1>
+            <ArtifactDossierNote
+              artifact={artifact}
+              imageCount={floatImages.length}
+              trackCount={albumTrackPreviews.length}
+            />
+            <div className="mt-6">
+              <ArtifactImageExperience
+                key={`${artifact.slug}:${initialImageSlug || ""}:mobile`}
+                images={floatImages}
+                initialImageSlug={initialImageSlug}
+                spotifyUrl={primarySpotifyUrl}
+              />
+            </div>
+          </header>
+        )}
+
+        {ELSEWHERE_ATMOSPHERE_V2 && (coverImageUrl || canEdit) && (
+          <div
+            className="elsewhere-artifact-cover-plate mx-auto mt-8 max-w-72 border border-stone-700 bg-black p-3 lg:hidden"
+            data-plate={artifactDossierCode(artifact)}
+          >
+            <ArchiveHeroImageDrop
+              artifactId={artifact.id}
+              alt={`${artifact.title} cover`}
+              canEdit={canEdit}
+              imageUrl={coverImageUrl}
+              label="Cover image"
+            />
+          </div>
+        )}
+
+        <div
+          id="overview"
+          className={`grid scroll-mt-24 gap-8 lg:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)] ${
+            ELSEWHERE_ATMOSPHERE_V2 ? "mt-8" : "mt-10"
+          } ${ELSEWHERE_ATMOSPHERE_V2 ? "elsewhere-artifact-layout-v2" : ""}`}
+        >
+          <aside
+            id="listen-watch"
+            className={`scroll-mt-24 ${
+              ELSEWHERE_ATMOSPHERE_V2
+                ? "elsewhere-artifact-side-file order-2 lg:order-none"
+                : ""
+            }`}
+          >
+            {(coverImageUrl || canEdit) && <div
+              className={`border border-stone-700 bg-black p-3 ${
+                ELSEWHERE_ATMOSPHERE_V2
+                  ? "elsewhere-artifact-cover-plate hidden lg:block"
+                  : ""
+              }`}
+              data-plate={artifactDossierCode(artifact)}
+            >
               <ArchiveHeroImageDrop
                 artifactId={artifact.id}
                 alt={`${artifact.title} cover`}
@@ -1213,29 +1394,58 @@ function VisualScrapbook({
             </div>
           </aside>
 
-          <section>
-            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-              elsewhere / {presentationType}
-            </p>
-            <h1 className="mt-4 font-serif text-7xl leading-none text-stone-100 md:text-9xl">
-              {artifact.title}
-            </h1>
-            <div className="mt-6">
-              <ArtifactImageExperience
-                key={`${artifact.slug}:${initialImageSlug || ""}`}
-                images={floatImages}
-                initialImageSlug={initialImageSlug}
-                spotifyUrl={primarySpotifyUrl}
+          <section
+            className={
+              ELSEWHERE_ATMOSPHERE_V2
+                ? "elsewhere-artifact-main-file order-1 lg:order-none"
+                : ""
+            }
+          >
+            <div className={ELSEWHERE_ATMOSPHERE_V2 ? "hidden lg:block" : ""}>
+              <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
+                elsewhere / {presentationType}
+              </p>
+              <h1 className="mt-4 font-serif text-7xl leading-none text-stone-100 md:text-9xl">
+                {artifact.title}
+              </h1>
+              <ArtifactDossierNote
+                artifact={artifact}
+                imageCount={floatImages.length}
+                trackCount={albumTrackPreviews.length}
               />
+              <div className="mt-6">
+                <ArtifactImageExperience
+                  key={`${artifact.slug}:${initialImageSlug || ""}`}
+                  images={floatImages}
+                  initialImageSlug={initialImageSlug}
+                  spotifyUrl={primarySpotifyUrl}
+                />
+              </div>
             </div>
             {artifact.fragment && (
               <p className="mt-5 max-w-2xl font-serif text-xl italic leading-8 text-stone-300">
                 “{artifact.fragment}”
               </p>
             )}
+            <SourceInterference
+              className="mt-7"
+              context={{
+                artifactSlug: artifact.slug,
+                atmosphere: artifact.atmosphere || [],
+                motifs: artifact.motifs || [],
+              }}
+              limit={2}
+            />
 
             {visualSlotCount > 0 && (isAlbumPage || isSingleRelease) && (
-              <section id="ephemera" className="mt-9 scroll-mt-24">
+              <section
+                id="ephemera"
+                className={`mt-9 scroll-mt-24 ${
+                  ELSEWHERE_ATMOSPHERE_V2
+                    ? "elsewhere-artifact-evidence-section"
+                    : ""
+                }`}
+              >
                 <h2 className="mb-6 text-[10px] uppercase tracking-[0.36em] text-stone-500">
                   Ephemera
                 </h2>
@@ -1278,27 +1488,6 @@ function VisualScrapbook({
                   />
                 ))}
               </div>
-            )}
-
-            {threads.length > 0 && (
-              <section id="threads" className="mt-12 scroll-mt-24 border-t border-stone-800 pt-7">
-                <h2 className="mb-4 text-[10px] uppercase tracking-[0.3em] text-stone-600">
-                  Threads
-                </h2>
-                <div className="flex flex-wrap gap-x-4 gap-y-2">
-                  {threads.map((thread) =>
-                    thread.href ? (
-                      <Link
-                        key={`${thread.href}-${thread.label}`}
-                        href={thread.href}
-                        className="text-xs uppercase tracking-[0.18em] text-stone-500 transition hover:text-stone-200"
-                      >
-                        {thread.label}
-                      </Link>
-                    ) : null
-                  )}
-                </div>
-              </section>
             )}
 
             {primaryLyrics && (
@@ -1350,10 +1539,14 @@ export default async function ArtifactPage({
   let artifactQuery = supabase
     .from("artifacts")
     .select(
-      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, album, year, era, sort_order"
+      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, discovery_visibility, album, year, era, sort_order"
     )
     .eq("slug", slug);
-  if (!canEdit) artifactQuery = artifactQuery.eq("is_public", true);
+  if (!canEdit) {
+    artifactQuery = artifactQuery
+      .eq("is_public", true)
+      .in("discovery_visibility", ["public", "hidden"]);
+  }
   const { data: artifact, error } = await artifactQuery.single();
 
   if (error || !artifact) {
@@ -1379,13 +1572,33 @@ export default async function ArtifactPage({
   let allArtifactsQuery = supabase
     .from("artifacts")
     .select(
-      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, album, year, era, sort_order"
+      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, discovery_visibility, album, year, era, sort_order"
     )
     .neq("slug", currentArtifact.slug);
-  if (!canEdit) allArtifactsQuery = allArtifactsQuery.eq("is_public", true);
+  if (!canEdit) {
+    allArtifactsQuery = allArtifactsQuery
+      .eq("is_public", true)
+      .eq("discovery_visibility", "public");
+  }
   const { data: allArtifactsData } = await allArtifactsQuery;
 
+  let hiddenArtifactsQuery = supabase
+    .from("artifacts")
+    .select(
+      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, discovery_visibility, album, year, era, sort_order"
+    )
+    .eq("is_public", true)
+    .eq("discovery_visibility", "hidden")
+    .neq("slug", currentArtifact.slug)
+    .limit(12);
+  if (canEdit) hiddenArtifactsQuery = hiddenArtifactsQuery.limit(0);
+  const { data: hiddenArtifactsData } = await hiddenArtifactsQuery;
+
   const allArtifacts = (allArtifactsData || []).map((item) => ({
+    ...item,
+    spotify_url: spotifyUrls.get(item.id) || null,
+  })) as Artifact[];
+  const hiddenArtifacts = (hiddenArtifactsData || []).map((item) => ({
     ...item,
     spotify_url: spotifyUrls.get(item.id) || null,
   })) as Artifact[];
@@ -1616,13 +1829,9 @@ export default async function ArtifactPage({
   const presentationType = isSingleRelease ? "Single" : currentArtifactType;
   const archiveFloatImages = artwork
     .filter((item) => item.image_url)
-    .map((item) => ({
-      src: item.image_url || "",
-      alt: item.title,
-      slug: item.slug,
-    }));
+    .map(artifactFloatImage);
 
-  const nearbyArtifacts = allArtifacts
+  const ordinaryNearbyArtifacts = allArtifacts
     .map((candidate) => ({
       ...candidate,
       score: scoreNearby(currentArtifact, candidate),
@@ -1637,11 +1846,28 @@ export default async function ArtifactPage({
     )
     .sort((a, b) => b.score - a.score)
     .slice(0, 4);
+  const hiddenNearbyArtifact =
+    !canEdit &&
+    currentArtifact.discovery_visibility !== "hidden" &&
+    shouldRevealHiddenArtifact(currentArtifact.slug)
+      ? hiddenArtifacts
+          .map((candidate) => ({
+            ...candidate,
+            hiddenDiscovery: true,
+            score: Math.max(scoreNearby(currentArtifact, candidate), 1),
+            shared: sharedThreads(currentArtifact, candidate),
+          }))
+          .sort((a, b) => b.score - a.score)[0]
+      : null;
+  const nearbyArtifacts = hiddenNearbyArtifact
+    ? [...ordinaryNearbyArtifacts.slice(0, 3), hiddenNearbyArtifact]
+    : ordinaryNearbyArtifacts;
 
   const { data: driftArtifact } = await supabase
     .from("artifacts")
     .select("slug")
     .eq("is_public", true)
+    .eq("discovery_visibility", "public")
     .neq("slug", currentArtifact.slug)
     .limit(1)
     .maybeSingle();
@@ -1791,15 +2017,6 @@ export default async function ArtifactPage({
                   {getArtifactType(currentArtifact)}
                 </span>
               )}
-
-              {(currentArtifact.atmosphere || []).map((mood) => (
-                <span
-                  key={mood}
-                  className="rounded-full bg-stone-900 px-3 py-1 text-xs text-stone-500"
-                >
-                  {mood}
-                </span>
-              ))}
             </div>
 
             <h1 className="mt-6 font-serif text-5xl text-stone-100 md:text-7xl">
@@ -1851,25 +2068,6 @@ export default async function ArtifactPage({
                   {currentArtifact.lyrics}
                 </div>
               </section>
-            )}
-
-            {currentArtifact.motifs && currentArtifact.motifs.length > 0 && (
-              <div className="mt-10">
-                <p className="mb-3 text-xs uppercase tracking-[0.3em] text-stone-600">
-                  Motifs
-                </p>
-
-                <div className="flex flex-wrap gap-2">
-                  {currentArtifact.motifs.map((motif) => (
-                    <span
-                      key={motif}
-                      className="rounded-full border border-stone-800 px-4 py-2 text-xs text-stone-500"
-                    >
-                      {motif}
-                    </span>
-                  ))}
-                </div>
-              </div>
             )}
 
             <ChildLinkList title="Albums" items={albums} />

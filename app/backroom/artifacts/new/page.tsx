@@ -4,6 +4,7 @@ import crypto from "crypto";
 import TitleSlugFields from "@/components/TitleSlugFields";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
 import { spotifyUrl } from "@/lib/spotify";
+import { artifactVisibility } from "@/lib/artifact-visibility";
 
 type ArtifactOption = {
   id: string;
@@ -201,6 +202,9 @@ async function createArtifact(formData: FormData) {
     ...(spotify_url ? { spotify_url } : {}),
     private_notes: String(formData.get("private_notes") || "").trim(),
     is_public: formData.get("is_public") === "yes",
+    discovery_visibility: artifactVisibility(
+      formData.get("discovery_visibility")
+    ),
   });
 
   if (error) throw new Error(error.message);
@@ -560,6 +564,26 @@ export default async function NewArtifactPage({
             <input type="checkbox" name="is_public" value="yes" />
             Publish this artifact immediately
           </label>
+
+          <section className="space-y-3 rounded-2xl border border-stone-800 bg-stone-950/60 p-6">
+            <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+              Discovery visibility
+            </label>
+            <select
+              name="discovery_visibility"
+              defaultValue="public"
+              className="w-full border border-stone-800 bg-neutral-950 px-4 py-3 text-stone-200 outline-none focus:border-stone-400"
+            >
+              <option value="public">Public surfaces</option>
+              <option value="hidden">Hidden / drift discoverable</option>
+              <option value="backroom">Backroom only</option>
+            </select>
+            <p className="text-xs leading-5 text-stone-600">
+              Hidden artifacts need to be published to become discoverable, but
+              they stay out of ordinary maps, rooms, search surfaces, and nearby
+              lists unless the archive reveals them.
+            </p>
+          </section>
 
           <button
             type="submit"

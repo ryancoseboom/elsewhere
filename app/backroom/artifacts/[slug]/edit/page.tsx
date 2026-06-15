@@ -8,6 +8,7 @@ import crypto from "crypto";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
 import { syncArtifactDescendantPublication } from "@/lib/artifact-publication";
 import { spotifyUrl } from "@/lib/spotify";
+import { artifactVisibility } from "@/lib/artifact-visibility";
 
 type Artifact = {
   id: string;
@@ -33,6 +34,7 @@ type Artifact = {
   youtube_url: string | null;
   spotify_url: string | null;
   private_notes: string | null;
+  discovery_visibility: string | null;
   lyrics: string | null;
   album: string | null;
   year: string | null;
@@ -229,6 +231,9 @@ async function updateArtifact(formData: FormData) {
       year: String(formData.get("year") || "").trim(),
       era: String(formData.get("era") || "").trim(),
       is_public: isPublic,
+      discovery_visibility: artifactVisibility(
+        formData.get("discovery_visibility")
+      ),
     })
     .eq("id", id)
     .select("id")
@@ -344,7 +349,7 @@ export default async function EditArtifactPage({
   const { data: artifact, error } = await supabase
     .from("artifacts")
     .select(
-      "id, slug, title, parent_slug, kind, artifact_type, parent_id, band_id, album_id, song_id, sort_order, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, private_notes, lyrics, album, year, era, is_public"
+      "id, slug, title, parent_slug, kind, artifact_type, parent_id, band_id, album_id, song_id, sort_order, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, private_notes, discovery_visibility, lyrics, album, year, era, is_public"
     )
     .eq("slug", slug)
     .single();
@@ -456,6 +461,26 @@ export default async function EditArtifactPage({
             />
             Publish this artifact
           </label>
+
+          <section className="space-y-3 border border-stone-800 bg-stone-950/60 p-6">
+            <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
+              Discovery visibility
+            </label>
+            <select
+              name="discovery_visibility"
+              defaultValue={item.discovery_visibility || "public"}
+              className="w-full border border-stone-800 bg-neutral-950 px-4 py-3 text-stone-200 outline-none focus:border-stone-400"
+            >
+              <option value="public">Public surfaces</option>
+              <option value="hidden">Hidden / drift discoverable</option>
+              <option value="backroom">Backroom only</option>
+            </select>
+            <p className="text-xs leading-5 text-stone-600">
+              Hidden artifacts must remain published to be discoverable, but
+              they stay out of normal archive maps and only surface through
+              drift, Float, and rare hidden-entry moments.
+            </p>
+          </section>
 
           <section className="space-y-6 border border-stone-800 bg-stone-950/60 p-6">
             <div>

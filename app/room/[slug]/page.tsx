@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import SourceInterference from "@/components/SourceInterference";
 import { createClient } from "@/lib/supabase/server";
 
 type Artifact = {
@@ -52,6 +53,7 @@ export default async function RoomPage({
       "id, slug, title, kind, fragment, description, rooms, motifs, atmosphere, image_url"
     )
     .eq("is_public", true)
+    .eq("discovery_visibility", "public")
     .not("rooms", "is", null)
     .order("created_at", { ascending: false });
 
@@ -93,6 +95,11 @@ export default async function RoomPage({
           <p className="mt-6 max-w-2xl text-stone-400 leading-relaxed">
             {copy?.line || "A room that has begun to gather things."}
           </p>
+          <SourceInterference
+            className="mt-7"
+            context={{ room: slug }}
+            limit={2}
+          />
         </header>
 
         <section className="grid gap-5 md:grid-cols-2">
