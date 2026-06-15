@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 import { archiveTextureSet } from "@/lib/archive-textures";
 
 export type FloatExperimentArtifact = {
@@ -17,6 +23,7 @@ export type FloatExperimentArtifact = {
   id: string;
   image_url: string | null;
   kind: string | null;
+  lyrics?: string | null;
   motifs: string[] | null;
   nearby: string[] | null;
   parent_id: string | null;
@@ -39,6 +46,7 @@ type MemoryPiece = {
   reasons: string[];
   rotate: number;
   top: number;
+  treatment: "alive" | "faded" | "ghost";
   width: number;
   zIndex: number;
 };
@@ -47,6 +55,23 @@ type Relationship = {
   reasons: string[];
   score: number;
 };
+
+type TransmissionText = {
+  blur: number;
+  className: string;
+  left: number;
+  mutate: boolean;
+  opacity: number;
+  reason: string;
+  rotate: number;
+  source: string;
+  text: string;
+  top: number;
+  zIndex: number;
+};
+
+const ELSEWHERE_FLOAT_INTENSITY_V2 = true;
+const mutationGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#/*-+<>[]{}?";
 
 const designPrinciples = [
   "stillness over spectacle",
@@ -72,6 +97,10 @@ const layoutSlots = [
   { height: 13, left: 4, top: 35, width: 12 },
   { height: 16, left: 48, top: 77, width: 12 },
   { height: 13, left: 17, top: 7, width: 11 },
+  { height: 24, left: 87, top: 57, width: 12 },
+  { height: 20, left: 39, top: 39, width: 15 },
+  { height: 14, left: 61, top: 83, width: 13 },
+  { height: 17, left: 2, top: 11, width: 12 },
 ];
 
 function seededUnit(seed: number) {
@@ -101,6 +130,57 @@ function overlap(left: string[] | null, right: string[] | null) {
 
 function artifactType(artifact: FloatExperimentArtifact) {
   return artifact.artifact_type || artifact.kind || "Artifact";
+}
+
+function clip(value: string, limit: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+
+  if (normalized.length <= limit) return normalized;
+
+  return `${normalized.slice(0, limit).replace(/\s+\S*$/, "")}`;
+}
+
+function textFragments(value?: string | null, limit = 8) {
+  return (value || "")
+    .split(/[\r\n]+|(?<=[.!?])\s+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 8)
+    .slice(0, limit)
+    .map((line) => clip(line, 96));
+}
+
+function sourceSignals(artifact: FloatExperimentArtifact) {
+  const signals: { reason: string; source: string; text: string }[] = [];
+
+  textFragments(artifact.lyrics, 6).forEach((text) =>
+    signals.push({ reason: "lyric memory attached to this artifact", source: artifact.title, text })
+  );
+  if (artifact.fragment) {
+    signals.push({
+      reason: "artifact fragment interrupting the transmission",
+      source: artifact.title,
+      text: artifact.fragment,
+    });
+  }
+  textFragments(artifact.description, 3).forEach((text) =>
+    signals.push({ reason: "description text breaking into captions", source: artifact.title, text })
+  );
+  signals.push({
+    reason: "artifact title converted into signal language",
+    source: artifact.title,
+    text: artifact.title,
+  });
+  uniqueList([
+    ...(artifact.motifs || []),
+    ...(artifact.atmosphere || []),
+    artifact.album,
+    artifact.era,
+    artifact.year,
+  ]).forEach((text) =>
+    signals.push({ reason: "motif or metadata becoming emotional text", source: artifact.title, text })
+  );
+
+  return signals;
 }
 
 function titleWords(artifact: FloatExperimentArtifact) {
@@ -274,6 +354,12 @@ function buildScene(
       reasons,
       rotate: seededRange(itemSeed + 4, -5.2, 5.2),
       top: Math.max(2, Math.min(84, slot.top + seededRange(itemSeed + 5, -3.5, 3.5))),
+      treatment:
+        seededUnit(itemSeed + 9) < 0.58
+          ? "alive"
+          : seededUnit(itemSeed + 9) < 0.84
+            ? "faded"
+            : "ghost",
       width: Math.max(9, slot.width + seededRange(itemSeed + 6, -2.5, 3.5)),
       zIndex: index === 0 ? 30 : 10 + layoutSlots.length - index,
     };
@@ -282,8 +368,189 @@ function buildScene(
   });
 }
 
+function buildTransmissionText(
+  scene: MemoryPiece[],
+  artifacts: FloatExperimentArtifact[],
+  seed: number,
+  cycle: number
+) {
+  const prioritized = [
+    ...scene.map((piece) => piece.artifact),
+    ...artifacts.filter(
+      (artifact) => !scene.some((piece) => piece.artifact.id === artifact.id)
+    ),
+  ];
+  const pool = prioritized.flatMap(sourceSignals);
+  const fallback = [
+    { reason: "fallback corrupted caption", source: "system", text: "THE HOUSE REMEMBERS" },
+    { reason: "fallback corrupted caption", source: "system", text: "SIGNAL LOSS / STILL LISTENING" },
+    { reason: "fallback corrupted caption", source: "system", text: "ARRIVAL BOARD FOR A LOST SONG" },
+    { reason: "fallback corrupted caption", source: "system", text: "DO NOT TRUST THE IMAGE" },
+  ];
+  const signals = pool.length ? pool : fallback;
+  const count = ELSEWHERE_FLOAT_INTENSITY_V2 ? 26 : 8;
+  const classes = [
+    "elsewhere-memory-text--micro",
+    "elsewhere-memory-text--small",
+    "elsewhere-memory-text--caption",
+    "elsewhere-memory-text--medium",
+    "elsewhere-memory-text--large",
+    "elsewhere-memory-text--huge",
+  ];
+
+  return Array.from({ length: count }, (_, index) => {
+    const textSeed = seed + cycle * 509 + index * 73;
+    const signal =
+      signals[Math.floor(seededUnit(textSeed + 1) * signals.length)] || fallback[0];
+    const sizeIndex = Math.min(
+      classes.length - 1,
+      Math.floor(Math.pow(seededUnit(textSeed + 2), 1.7) * classes.length)
+    );
+
+    return {
+      blur: seededUnit(textSeed + 3) < 0.18 ? seededRange(textSeed + 4, 0.4, 2.8) : 0,
+      className: classes[sizeIndex],
+      left: seededRange(textSeed + 5, -7, 93),
+      mutate: seededUnit(textSeed + 6) > 0.28,
+      opacity: seededRange(textSeed + 7, 0.12, sizeIndex > 3 ? 0.42 : 0.68),
+      reason: signal.reason,
+      rotate: seededRange(textSeed + 8, -10, 9),
+      source: signal.source,
+      text: clip(signal.text.toUpperCase(), sizeIndex > 3 ? 54 : 92),
+      top: seededRange(textSeed + 9, 5, 88),
+      zIndex: seededUnit(textSeed + 10) > 0.48 ? 24 : 6,
+    } satisfies TransmissionText;
+  });
+}
+
+function centralSignal(scene: MemoryPiece[], seed: number, cycle: number) {
+  const pool = scene.flatMap((piece) => sourceSignals(piece.artifact));
+  const signal =
+    pool[Math.floor(seededUnit(seed + cycle * 811) * Math.max(1, pool.length))] ||
+    { reason: "fallback central interruption", source: "system", text: "STAY WITH THE SIGNAL" };
+
+  return {
+    ...signal,
+    text: clip(signal.text.toUpperCase(), 42),
+  };
+}
+
+function mutateText(text: string, seed: number, tick: number, intensity: number) {
+  return Array.from(text)
+    .map((char, index) => {
+      if (char === " ") return " ";
+
+      const unit = seededUnit(seed + tick * 41 + index * 19);
+      if (unit > intensity) return char;
+
+      return mutationGlyphs[Math.floor(seededUnit(seed + tick * 53 + index * 29) * mutationGlyphs.length)] || char;
+    })
+    .join("");
+}
+
+function useReducedMotion() {
+  return useSyncExternalStore(
+    (callback) => {
+      const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+      query.addEventListener("change", callback);
+      return () => query.removeEventListener("change", callback);
+    },
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    () => false
+  );
+}
+
+function MutatingText({
+  className = "",
+  intensity = 0.12,
+  reducedMotion,
+  seed,
+  text,
+}: {
+  className?: string;
+  intensity?: number;
+  reducedMotion: boolean;
+  seed: number;
+  text: string;
+}) {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    const timer = window.setInterval(() => {
+      setTick((current) => current + 1);
+    }, 190 + Math.floor(seededUnit(seed) * 220));
+    return () => window.clearInterval(timer);
+  }, [reducedMotion, seed]);
+
+  return (
+    <span className={className}>
+      {reducedMotion ? text : mutateText(text, seed, tick, intensity)}
+    </span>
+  );
+}
+
+function TransmissionTextLayer({
+  reducedMotion,
+  signal,
+  seed,
+}: {
+  reducedMotion: boolean;
+  signal: TransmissionText;
+  seed: number;
+}) {
+  const style = {
+    "--memory-text-blur": `${signal.blur}px`,
+    "--memory-text-left": `${signal.left}%`,
+    "--memory-text-opacity": signal.opacity,
+    "--memory-text-rotate": `${signal.rotate}deg`,
+    "--memory-text-top": `${signal.top}%`,
+    "--memory-text-z": signal.zIndex,
+  } as CSSProperties;
+
+  return (
+    <span
+      className={`elsewhere-memory-text ${signal.className}`}
+      style={style}
+      title={`${signal.source}: ${signal.reason}`}
+    >
+      {signal.mutate ? (
+        <MutatingText
+          reducedMotion={reducedMotion}
+          seed={seed}
+          text={signal.text}
+          intensity={0.2}
+        />
+      ) : (
+        signal.text
+      )}
+    </span>
+  );
+}
+
 function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) {
   const textures = archiveTextureSet(`${piece.artifact.slug}:${seed}`, 3);
+  const treatment =
+    piece.treatment === "alive"
+      ? {
+          grayscale: seededRange(seed + 1, 0, 14),
+          saturate: seededRange(seed + 2, 96, 132),
+          brightness: seededRange(seed + 3, 82, 104),
+          contrast: seededRange(seed + 4, 102, 122),
+        }
+      : piece.treatment === "faded"
+        ? {
+            grayscale: seededRange(seed + 1, 24, 48),
+            saturate: seededRange(seed + 2, 62, 86),
+            brightness: seededRange(seed + 3, 74, 92),
+            contrast: seededRange(seed + 4, 98, 118),
+          }
+        : {
+            grayscale: seededRange(seed + 1, 78, 100),
+            saturate: seededRange(seed + 2, 20, 54),
+            brightness: seededRange(seed + 3, 58, 78),
+            contrast: seededRange(seed + 4, 128, 168),
+          };
   const style = {
     "--memory-height": `${piece.height}vh`,
     "--memory-left": `${piece.left}%`,
@@ -294,6 +561,10 @@ function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) 
     "--memory-z": piece.zIndex,
     "--memory-texture-a": `url(${textures[0]})`,
     "--memory-texture-b": `url(${textures[1]})`,
+    "--memory-grayscale": `${treatment.grayscale}%`,
+    "--memory-saturate": `${treatment.saturate}%`,
+    "--memory-brightness": `${treatment.brightness}%`,
+    "--memory-contrast": `${treatment.contrast}%`,
   } as CSSProperties;
 
   return (
@@ -331,23 +602,54 @@ export default function FloatExperiment({
 }) {
   const [cycle, setCycle] = useState(0);
   const [quiet, setQuiet] = useState(false);
+  const reducedMotion = useReducedMotion();
   const scene = useMemo(
     () => buildScene(artifacts, seed, cycle),
     [artifacts, cycle, seed]
   );
   const anchor = scene[0];
+  const transmissionText = useMemo(
+    () => buildTransmissionText(scene, artifacts, seed, cycle),
+    [artifacts, cycle, scene, seed]
+  );
+  const central = useMemo(() => centralSignal(scene, seed, cycle), [cycle, scene, seed]);
 
   useEffect(() => {
-    if (quiet) return;
+    if (reducedMotion) return;
+    if (quiet && !ELSEWHERE_FLOAT_INTENSITY_V2) return;
     const timer = window.setInterval(() => {
       setCycle((current) => current + 1);
-    }, 18_000);
+    }, quiet ? 9_800 : ELSEWHERE_FLOAT_INTENSITY_V2 ? 7_400 : 18_000);
     return () => window.clearInterval(timer);
-  }, [quiet]);
+  }, [quiet, reducedMotion]);
 
   return (
-    <main className="elsewhere-memory-stage min-h-screen overflow-hidden bg-[#070604] text-stone-200">
+    <main className={`elsewhere-memory-stage min-h-screen overflow-hidden bg-[#070604] text-stone-200 ${ELSEWHERE_FLOAT_INTENSITY_V2 ? "elsewhere-memory-stage--intensity-v2" : ""}`}>
       <div className="elsewhere-memory-ground" aria-hidden />
+      {ELSEWHERE_FLOAT_INTENSITY_V2 && (
+        <>
+          <div className="elsewhere-memory-broadcast" aria-hidden />
+          <div className="elsewhere-memory-text-field" aria-hidden>
+            {transmissionText.map((signal, index) => (
+              <TransmissionTextLayer
+                key={`${signal.text}-${cycle}-${index}`}
+                reducedMotion={reducedMotion}
+                seed={seed + cycle * 1009 + index * 61}
+                signal={signal}
+              />
+            ))}
+          </div>
+          <div className="elsewhere-memory-central" aria-hidden>
+            <MutatingText
+              className="elsewhere-memory-central__text"
+              intensity={0.16}
+              reducedMotion={reducedMotion}
+              seed={seed + cycle * 701}
+              text={central.text}
+            />
+          </div>
+        </>
+      )}
       <section className="relative z-20 flex min-h-screen flex-col px-5 py-5 md:px-8">
         <header className="flex items-start justify-between gap-5">
           <div>
@@ -389,9 +691,9 @@ export default function FloatExperiment({
 
         <footer className="relative z-40 flex flex-wrap items-end justify-between gap-4 border-t border-stone-900/80 pt-4">
           <p className="max-w-xl text-xs leading-6 text-stone-600">
-            This version avoids constant drift. It lets artifacts appear,
-            overlap, recur, and recede according to imperfect metadata
-            relationships.
+            This version lets artifacts overload the channel: images rotate,
+            captions corrupt, lyrics surface, and meaning keeps breaking through
+            the noise.
           </p>
           <div className="flex flex-wrap gap-3">
             <button
@@ -399,7 +701,7 @@ export default function FloatExperiment({
               className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.3em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
               onClick={() => setQuiet((current) => !current)}
             >
-              {quiet ? "Resume" : "Hold Still"}
+              {quiet ? "Resume Signal" : "Reduce Signal"}
             </button>
             <button
               type="button"
@@ -434,8 +736,30 @@ export default function FloatExperiment({
                   <span className="text-stone-600">Principles:</span>{" "}
                   {piece.principles.join("; ")}
                 </p>
+                <p className="mt-2 text-xs leading-5 text-stone-500">
+                  <span className="text-stone-600">Image treatment:</span>{" "}
+                  {piece.treatment}
+                </p>
               </article>
             ))}
+            {ELSEWHERE_FLOAT_INTENSITY_V2 && (
+              <article className="border-t border-stone-800 pt-3">
+                <h3 className="font-serif text-base text-stone-200">
+                  Central interruption
+                </h3>
+                <p className="mt-2 text-xs leading-5 text-stone-400">
+                  {central.text}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-stone-500">
+                  <span className="text-stone-600">Source:</span>{" "}
+                  {central.source}; {central.reason}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-stone-500">
+                  <span className="text-stone-600">Text layers:</span>{" "}
+                  {transmissionText.length}; mutation enabled selectively
+                </p>
+              </article>
+            )}
           </div>
         </aside>
       )}

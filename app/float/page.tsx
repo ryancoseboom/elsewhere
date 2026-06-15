@@ -32,7 +32,7 @@ export default async function GlobalFloatPage({
   const { data, error } = await supabase
     .from("artifacts")
     .select(
-      "id, slug, title, kind, artifact_type, parent_id, parent_slug, band_id, album_id, song_id, description, fragment, atmosphere, motifs, rooms, nearby, image_url, album, year, era, discovery_visibility"
+      "id, slug, title, kind, artifact_type, parent_id, parent_slug, band_id, album_id, song_id, description, fragment, lyrics, atmosphere, motifs, rooms, nearby, image_url, album, year, era, discovery_visibility"
     )
     .eq("is_public", true)
     .in("discovery_visibility", ["public", "hidden"])

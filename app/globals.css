@@ -1459,8 +1459,9 @@ button:hover > .elsewhere-archive-texture {
   z-index: 1;
   background:
     radial-gradient(circle at 48% 42%, rgba(120, 113, 108, 0.16), transparent 29%),
-    radial-gradient(circle at 19% 72%, rgba(127, 29, 29, 0.12), transparent 24%),
-    radial-gradient(circle at 77% 22%, rgba(44, 83, 63, 0.12), transparent 27%),
+    radial-gradient(circle at 19% 72%, rgba(220, 38, 38, 0.2), transparent 24%),
+    radial-gradient(circle at 77% 22%, rgba(34, 197, 94, 0.14), transparent 27%),
+    radial-gradient(circle at 61% 64%, rgba(59, 130, 246, 0.16), transparent 24%),
     #070604;
 }
 
@@ -1469,12 +1470,129 @@ button:hover > .elsewhere-archive-texture {
   background-image:
     url("/textures/float/dust-scratches.jpg"),
     url("/textures/float/folded-paper.jpg"),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 5px),
     radial-gradient(circle at center, transparent 46%, rgba(0, 0, 0, 0.66) 100%);
   background-position: center;
-  background-size: cover, cover, cover;
+  background-size: cover, cover, auto, cover;
   filter: grayscale(70%) contrast(190%) brightness(65%);
   mix-blend-mode: screen;
-  opacity: 0.13;
+  opacity: 0.16;
+}
+
+.elsewhere-memory-stage--intensity-v2::before {
+  background:
+    radial-gradient(circle at 14% 21%, rgba(239, 68, 68, 0.22), transparent 23%),
+    radial-gradient(circle at 74% 18%, rgba(20, 184, 166, 0.18), transparent 25%),
+    radial-gradient(circle at 58% 71%, rgba(250, 204, 21, 0.13), transparent 22%),
+    radial-gradient(circle at 52% 46%, rgba(231, 229, 228, 0.08), transparent 35%),
+    #070604;
+}
+
+.elsewhere-memory-broadcast,
+.elsewhere-memory-text-field,
+.elsewhere-memory-central {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.elsewhere-memory-broadcast {
+  z-index: 5;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 2.4rem, rgba(231, 229, 228, 0.04) 2.42rem 2.48rem, transparent 2.5rem 4.8rem),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 4px),
+    linear-gradient(110deg, transparent 0 40%, rgba(220, 38, 38, 0.13) 40.1% 40.35%, transparent 40.5% 100%);
+  mix-blend-mode: screen;
+  opacity: 0.28;
+  animation: elsewhere-memory-broadcast-slip 7.4s steps(3, end) infinite;
+}
+
+.elsewhere-memory-text-field {
+  z-index: 28;
+  overflow: hidden;
+}
+
+.elsewhere-memory-text {
+  position: absolute;
+  left: var(--memory-text-left);
+  top: var(--memory-text-top);
+  z-index: var(--memory-text-z);
+  max-width: min(46rem, 82vw);
+  opacity: var(--memory-text-opacity);
+  color: rgba(231, 229, 228, 0.78);
+  font-family: var(--font-geist-mono), monospace;
+  line-height: 0.95;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  filter: blur(var(--memory-text-blur));
+  mix-blend-mode: screen;
+  transform: rotate(var(--memory-text-rotate));
+  animation: elsewhere-memory-text-fault 7.4s steps(4, end) infinite;
+}
+
+.elsewhere-memory-text--micro {
+  max-width: 18rem;
+  font-size: clamp(0.45rem, 0.6vw, 0.62rem);
+  letter-spacing: 0.34em;
+}
+
+.elsewhere-memory-text--small {
+  max-width: 26rem;
+  font-size: clamp(0.62rem, 0.9vw, 0.88rem);
+  color: rgba(168, 162, 158, 0.78);
+}
+
+.elsewhere-memory-text--caption {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(0.9rem, 1.55vw, 1.55rem);
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.elsewhere-memory-text--medium {
+  font-size: clamp(1.1rem, 2.4vw, 2.8rem);
+  letter-spacing: 0.12em;
+}
+
+.elsewhere-memory-text--large {
+  max-width: 58rem;
+  color: color-mix(in srgb, #ef4444 34%, rgb(245 245 244));
+  font-size: clamp(2.3rem, 6.5vw, 7.5rem);
+  letter-spacing: 0.02em;
+}
+
+.elsewhere-memory-text--huge {
+  max-width: 76rem;
+  color: color-mix(in srgb, #22d3ee 22%, rgb(245 245 244));
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(4rem, 12vw, 14rem);
+  letter-spacing: -0.01em;
+}
+
+.elsewhere-memory-central {
+  z-index: 32;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 2rem;
+  mix-blend-mode: screen;
+}
+
+.elsewhere-memory-central__text {
+  display: block;
+  max-width: 150vw;
+  color: rgba(245, 245, 244, 0.28);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(7rem, 24vw, 26rem);
+  font-weight: 400;
+  line-height: 0.68;
+  text-align: center;
+  text-transform: uppercase;
+  text-wrap: balance;
+  transform: rotate(-3deg) scaleX(1.12);
+  animation: elsewhere-memory-central-interrupt 7.4s steps(2, end) infinite;
 }
 
 .elsewhere-memory-ground {
@@ -1544,7 +1662,11 @@ button:hover > .elsewhere-archive-texture {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: grayscale(76%) contrast(112%) brightness(78%) saturate(82%);
+  filter:
+    grayscale(var(--memory-grayscale, 76%))
+    contrast(var(--memory-contrast, 112%))
+    brightness(var(--memory-brightness, 78%))
+    saturate(var(--memory-saturate, 82%));
   transition:
     filter 900ms ease,
     transform 900ms ease;
@@ -1565,7 +1687,7 @@ button:hover > .elsewhere-archive-texture {
   background-size: cover, 160% 160%;
   filter: grayscale(80%) brightness(145%) contrast(240%);
   mix-blend-mode: screen;
-  opacity: 0.18;
+  opacity: 0.1;
 }
 
 .elsewhere-memory-photo::after {
@@ -1580,7 +1702,7 @@ button:hover > .elsewhere-archive-texture {
 }
 
 .elsewhere-memory-piece:hover .elsewhere-memory-photo img {
-  filter: grayscale(24%) contrast(106%) brightness(92%) saturate(92%);
+  filter: grayscale(0%) contrast(106%) brightness(96%) saturate(118%);
   transform: scale(1.025);
 }
 
@@ -1683,6 +1805,83 @@ button:hover > .elsewhere-archive-texture {
   box-shadow: -24px 0 60px rgba(0, 0, 0, 0.5);
 }
 
+@keyframes elsewhere-memory-broadcast-slip {
+  0%,
+  100% {
+    opacity: 0.18;
+    transform: translate3d(0, 0, 0);
+  }
+
+  24% {
+    opacity: 0.34;
+    transform: translate3d(-0.6rem, 0.2rem, 0);
+  }
+
+  48% {
+    opacity: 0.12;
+    transform: translate3d(0.4rem, -0.1rem, 0);
+  }
+
+  51% {
+    opacity: 0.42;
+  }
+}
+
+@keyframes elsewhere-memory-text-fault {
+  0%,
+  100% {
+    clip-path: inset(0 0 0 0);
+    translate: 0 0;
+  }
+
+  31% {
+    clip-path: inset(0 0 42% 0);
+    translate: 0.16rem -0.08rem;
+  }
+
+  33% {
+    clip-path: inset(54% 0 0 0);
+    translate: -0.24rem 0.06rem;
+  }
+
+  61% {
+    clip-path: inset(0 14% 0 0);
+  }
+
+  64% {
+    clip-path: inset(0 0 0 21%);
+  }
+}
+
+@keyframes elsewhere-memory-central-interrupt {
+  0%,
+  100% {
+    opacity: 0.16;
+    filter: blur(0);
+    translate: 0 0;
+  }
+
+  18% {
+    opacity: 0.34;
+  }
+
+  21% {
+    opacity: 0.07;
+    filter: blur(1.2px);
+    translate: -0.8rem 0.3rem;
+  }
+
+  48% {
+    opacity: 0.27;
+    filter: blur(0.4px);
+    translate: 0.3rem -0.4rem;
+  }
+
+  52% {
+    opacity: 0.11;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .elsewhere-float-drift-image,
   .elsewhere-float-texture,
@@ -1692,7 +1891,10 @@ button:hover > .elsewhere-archive-texture {
   .elsewhere-float-sleeve-piece,
   .elsewhere-float-sleeve-note,
   .elsewhere-float-sleeve-lyric,
-  .elsewhere-memory-piece {
+  .elsewhere-memory-piece,
+  .elsewhere-memory-broadcast,
+  .elsewhere-memory-text,
+  .elsewhere-memory-central__text {
     animation-duration: 1ms;
   }
 }
