@@ -19,6 +19,9 @@ import ArtifactMediaTitle from "@/components/ArtifactMediaTitle";
 import ArtifactImageExperience, {
   ArtifactImageButton,
 } from "@/components/ArtifactImageExperience";
+import FloatExperiment, {
+  type FloatExperimentArtifact,
+} from "@/components/FloatExperiment";
 import ArtifactSectionOrder from "@/components/ArtifactSectionOrder";
 import {
   ArtifactEphemeraBrowser,
@@ -80,6 +83,36 @@ function artifactFloatImage(artifact: Artifact) {
     slug: artifact.slug,
     src: artifact.image_url || "",
     alt: artifact.title,
+    year: artifact.year,
+  };
+}
+
+function artifactFloatExperimentArtifact(
+  artifact: Artifact,
+  fallbackImageUrl?: string | null
+): FloatExperimentArtifact {
+  return {
+    album: artifact.album,
+    album_id: artifact.album_id,
+    artifact_type: artifact.artifact_type,
+    atmosphere: artifact.atmosphere,
+    band_id: artifact.band_id,
+    description: artifact.description,
+    discovery_visibility: artifact.discovery_visibility,
+    era: artifact.era,
+    fragment: artifact.fragment,
+    id: artifact.id,
+    image_url: artifact.image_url || fallbackImageUrl || null,
+    kind: artifact.kind,
+    lyrics: artifact.lyrics,
+    motifs: artifact.motifs,
+    nearby: artifact.nearby,
+    parent_id: artifact.parent_id,
+    parent_slug: artifact.parent_slug,
+    rooms: artifact.rooms,
+    slug: artifact.slug,
+    song_id: artifact.song_id,
+    title: artifact.title,
     year: artifact.year,
   };
 }
@@ -1513,6 +1546,9 @@ export default async function ArtifactPage({
 }: {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{
+    debug?: string | string[];
+    float?: string | string[];
+    floatDebug?: string | string[];
     image?: string | string[];
     view?: string | string[];
   }>;
@@ -1521,9 +1557,24 @@ export default async function ArtifactPage({
   const resolvedSearchParams = await searchParams;
   const requestedView = resolvedSearchParams.view;
   const requestedImage = resolvedSearchParams.image;
+  const requestedFloat = resolvedSearchParams.float;
+  const requestedFloatDebug =
+    resolvedSearchParams.floatDebug || resolvedSearchParams.debug;
   const initialImageSlug = Array.isArray(requestedImage)
     ? requestedImage[0]
     : requestedImage;
+  const floatValue = Array.isArray(requestedFloat)
+    ? requestedFloat[0]
+    : requestedFloat;
+  const floatDebugValue = Array.isArray(requestedFloatDebug)
+    ? requestedFloatDebug[0]
+    : requestedFloatDebug;
+  const artifactFloatMode = ["1", "true", "intensity", "v2"].includes(
+    floatValue || ""
+  );
+  const artifactFloatDebugMode = ["1", "true", "debug", "float"].includes(
+    floatDebugValue || ""
+  );
   const viewValue = Array.isArray(requestedView)
     ? requestedView[0]
     : requestedView;
@@ -1862,6 +1913,57 @@ export default async function ArtifactPage({
   const nearbyArtifacts = hiddenNearbyArtifact
     ? [...ordinaryNearbyArtifacts.slice(0, 3), hiddenNearbyArtifact]
     : ordinaryNearbyArtifacts;
+
+  if (artifactFloatMode) {
+    const fallbackImageUrl =
+      currentArtifact.image_url ||
+      albumArtifact?.image_url ||
+      artwork.find((item) => item.image_url)?.image_url ||
+      nearbyArtifacts.find((item) => item.image_url)?.image_url ||
+      allArtifacts.find((item) => item.image_url)?.image_url ||
+      null;
+    const relationshipPool = allArtifacts.filter((candidate) => {
+      if (!candidate.image_url) return false;
+
+      return (
+        candidate.parent_id === currentArtifact.id ||
+        candidate.parent_slug === currentArtifact.slug ||
+        candidate.song_id === currentArtifact.id ||
+        candidate.album_id === currentArtifact.id ||
+        candidate.album_id === currentArtifact.album_id ||
+        candidate.band_id === currentArtifact.band_id ||
+        Boolean(scoreNearby(currentArtifact, candidate))
+      );
+    });
+    const floatArtifactMap = new Map<string, FloatExperimentArtifact>();
+
+    [
+      artifactFloatExperimentArtifact(currentArtifact, fallbackImageUrl),
+      ...(albumArtifact
+        ? [artifactFloatExperimentArtifact(albumArtifact)]
+        : []),
+      ...childArtifacts.map((item) => artifactFloatExperimentArtifact(item)),
+      ...albumTracks.map((item) => artifactFloatExperimentArtifact(item)),
+      ...nearbyArtifacts.map((item) => artifactFloatExperimentArtifact(item)),
+      ...relationshipPool.map((item) => artifactFloatExperimentArtifact(item)),
+    ].forEach((item) => {
+      if (item.image_url) floatArtifactMap.set(item.id, item);
+    });
+
+    const floatArtifacts = [...floatArtifactMap.values()].slice(0, 48);
+    const experimentSeed = [...currentArtifact.slug].reduce(
+      (total, char, index) => total + char.charCodeAt(0) * (index + 17),
+      1701
+    );
+
+    return (
+      <FloatExperiment
+        artifacts={floatArtifacts}
+        debugMode={artifactFloatDebugMode}
+        seed={experimentSeed}
+      />
+    );
+  }
 
   const { data: driftArtifact } = await supabase
     .from("artifacts")

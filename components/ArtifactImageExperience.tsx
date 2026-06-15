@@ -1182,6 +1182,14 @@ export default function ArtifactImageExperience({
     floatVariant === "sleeve" &&
     ["1", "true", "debug", "float"].includes(floatDebugParam || "");
   const routeKey = `${pathname}?${searchParamString}`;
+  const intensityFloatHref = useMemo(() => {
+    const params = new URLSearchParams(searchParamString);
+
+    params.set("float", "1");
+    params.delete("image");
+
+    return `${pathname}?${params.toString()}`;
+  }, [pathname, searchParamString]);
   const [lightboxState, setLightboxState] = useState<LightboxState | null>(
     () => {
       const initialImage = initialImageSlug
@@ -1590,13 +1598,12 @@ export default function ArtifactImageExperience({
       {showTrigger && (images.length > 0 || streamUrl) && (
         <div className="flex flex-wrap gap-3">
           {images.length > 0 && (
-            <button
-              type="button"
+            <a
+              href={intensityFloatHref}
               className="border border-stone-700 px-4 py-2 text-[10px] uppercase tracking-[0.4em] text-stone-400 transition hover:border-stone-400 hover:bg-stone-900 hover:text-stone-100"
-              onClick={() => setFloatSetup("record")}
             >
               Float
-            </button>
+            </a>
           )}
           {streamUrl && (
             <a
