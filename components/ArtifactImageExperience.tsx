@@ -11,7 +11,6 @@ import {
   type PointerEvent,
   type TouchEvent,
 } from "react";
-import FloatRecorder, { type FloatRecording } from "./FloatRecorder";
 import { ARCHIVE_TEXTURES, archiveTextureSet } from "@/lib/archive-textures";
 import { spotifyUrl as normalizeSpotifyUrl } from "@/lib/spotify";
 
@@ -38,12 +37,6 @@ type ArtifactImageButtonProps = ExperienceImage & {
   className?: string;
   imageClassName?: string;
   loading?: "eager" | "lazy";
-};
-
-type RecordingDimensions = {
-  height: number;
-  label: string;
-  width: number;
 };
 
 type FloatVariant = "classic" | "sleeve";
@@ -84,27 +77,8 @@ type FloatSleeveBurst = {
   textIndex: number | null;
 };
 
-type SaveFilePickerWindow = Window & {
-  showSaveFilePicker?: (options: {
-    suggestedName: string;
-    types: {
-      accept: Record<string, string[]>;
-      description: string;
-    }[];
-  }) => Promise<{
-    createWritable: () => Promise<{
-      close: () => Promise<void>;
-      write: (data: Blob) => Promise<void>;
-    }>;
-  }>;
-};
-
 const openImageEvent = "elsewhere:open-image";
 const closeImageEvent = "elsewhere:close-image";
-const recordingDimensions: RecordingDimensions[] = [
-  { height: 1080, label: "Landscape / 1920 x 1080", width: 1920 },
-  { height: 1920, label: "Portrait / 1080 x 1920", width: 1080 },
-];
 const floatTextures = ARCHIVE_TEXTURES;
 const floatTextureCount = 7;
 const floatSleeveSlots = [
@@ -1201,16 +1175,7 @@ export default function ArtifactImageExperience({
   const lightboxImage =
     lightboxState?.routeKey === routeKey ? lightboxState.image : null;
   const [floating, setFloating] = useState(autoLaunch && images.length > 0);
-  const [floatSeed, setFloatSeed] = useState(0);
-  const [floatSetup, setFloatSetup] = useState<"record" | "dimensions" | null>(
-    null
-  );
-  const [recording, setRecording] = useState<RecordingDimensions | null>(null);
-  const [recordingError, setRecordingError] = useState<string | null>(null);
-  const [savedRecording, setSavedRecording] = useState<FloatRecording | null>(
-    null
-  );
-  const [recordingName, setRecordingName] = useState("elsewhere-float");
+  const [floatSeed] = useState(0);
   const [sleeveTextIndex, setSleeveTextIndex] = useState(0);
   const [sleeveBurst, setSleeveBurst] = useState<FloatSleeveBurst>({
     colorIndex: null,
@@ -1257,66 +1222,6 @@ export default function ArtifactImageExperience({
     setLightboxState(null);
     window.setTimeout(() => previousActiveElementRef.current?.focus(), 0);
   }, []);
-
-  const launchFloat = useCallback(() => {
-    setFloatSeed(Math.floor(Math.random() * 1_000_000));
-    setFloatSetup(null);
-    setFloating(true);
-  }, []);
-
-  const completeRecording = useCallback((completedRecording: FloatRecording) => {
-    setRecording(null);
-    setFloating(false);
-    setSavedRecording(completedRecording);
-  }, []);
-
-  const failRecording = useCallback((message: string) => {
-    setRecording(null);
-    setFloating(false);
-    setRecordingError(message);
-  }, []);
-
-  async function saveRecording() {
-    if (!savedRecording) return;
-
-    const filename = `${recordingName.trim() || "elsewhere-float"}.${
-      savedRecording.extension
-    }`;
-    const picker = (window as SaveFilePickerWindow).showSaveFilePicker;
-
-    if (picker) {
-      try {
-        const handle = await picker({
-          suggestedName: filename,
-          types: [
-            {
-              accept: {
-                [savedRecording.mimeType || `video/${savedRecording.extension}`]: [
-                  `.${savedRecording.extension}`,
-                ],
-              },
-              description: `${savedRecording.extension.toUpperCase()} video`,
-            },
-          ],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(savedRecording.blob);
-        await writable.close();
-        setSavedRecording(null);
-        return;
-      } catch (error) {
-        if ((error as Error).name === "AbortError") return;
-      }
-    }
-
-    const url = URL.createObjectURL(savedRecording.blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setSavedRecording(null);
-  }
 
   useEffect(() => {
     function openImage(event: Event) {
@@ -1417,14 +1322,14 @@ export default function ArtifactImageExperience({
   }, []);
 
   useEffect(() => {
-    if (!floating || floatVariant !== "sleeve" || recording) return;
+    if (!floating || floatVariant !== "sleeve") return;
 
     const timer = window.setInterval(() => {
       setSleeveTextIndex((current) => current + 1);
     }, 3200);
 
     return () => window.clearInterval(timer);
-  }, [floatVariant, floating, recording]);
+  }, [floatVariant, floating]);
 
   function moveFloat(event: PointerEvent<HTMLDivElement>) {
     const x = (event.clientX / window.innerWidth - 0.5) * 2;
@@ -1458,7 +1363,7 @@ export default function ArtifactImageExperience({
       : sleeveLyricFragments[sleeveBurst.lyricIndex % sleeveLyricFragments.length] ||
         null;
   useEffect(() => {
-    if (!floating || floatVariant !== "sleeve" || recording) return;
+    if (!floating || floatVariant !== "sleeve") return;
 
     let clearTimer = 0;
     const timer = window.setInterval(() => {
@@ -1505,7 +1410,6 @@ export default function ArtifactImageExperience({
     floatSeed,
     floatVariant,
     floating,
-    recording,
     sleeveLyricFragments.length,
     sleevePieces.length,
     sleeveTextFragments.length,
@@ -1615,148 +1519,6 @@ export default function ArtifactImageExperience({
               Stream on Spotify
             </a>
           )}
-        </div>
-      )}
-
-      {floatSetup && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-5 backdrop-blur-sm">
-          <div className="w-full max-w-lg border border-stone-700 bg-[#11100e] p-6 text-stone-300 shadow-2xl">
-            {floatSetup === "record" ? (
-              <>
-                <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-                  Float / visual transmission
-                </p>
-                <h2 className="mt-5 font-serif text-3xl text-stone-100">
-                  Would you like to record this FLOAT?
-                </h2>
-                <p className="mt-3 text-sm leading-6 text-stone-500">
-                  A recording captures the first 30 seconds without interface
-                  labels or buttons.
-                </p>
-                <div className="mt-7 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    className="border border-stone-500 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-100 transition hover:bg-stone-800"
-                    onClick={() => setFloatSetup("dimensions")}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    className="border border-stone-700 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-400 transition hover:border-stone-500 hover:text-stone-100"
-                    onClick={launchFloat}
-                  >
-                    No
-                  </button>
-                  <button
-                    type="button"
-                    className="px-3 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-600 transition hover:text-stone-300"
-                    onClick={() => setFloatSetup(null)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-                  Record FLOAT
-                </p>
-                <h2 className="mt-5 font-serif text-3xl text-stone-100">
-                  Choose the recording format
-                </h2>
-                <p className="mt-3 text-sm leading-6 text-stone-500">
-                  Recording begins immediately after you select an orientation.
-                </p>
-                <div className="mt-7 grid gap-3">
-                  {recordingDimensions.map((dimensions) => (
-                    <button
-                      key={dimensions.label}
-                      type="button"
-                      className="border border-stone-700 px-5 py-4 text-left text-[10px] uppercase tracking-[0.3em] text-stone-300 transition hover:border-stone-400 hover:bg-stone-900 hover:text-white"
-                      onClick={() => {
-                        setFloatSeed(Math.floor(Math.random() * 1_000_000));
-                        setRecording(dimensions);
-                        setFloatSetup(null);
-                        setFloating(true);
-                      }}
-                    >
-                      {dimensions.label}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className="mt-5 text-[10px] uppercase tracking-[0.32em] text-stone-600 transition hover:text-stone-300"
-                  onClick={() => setFloatSetup("record")}
-                >
-                  Back
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {savedRecording && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-5 backdrop-blur-sm">
-          <div className="w-full max-w-lg border border-stone-700 bg-[#11100e] p-6 text-stone-300 shadow-2xl">
-            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-              FLOAT recorded
-            </p>
-            <h2 className="mt-5 font-serif text-3xl text-stone-100">
-              Save the 30-second transmission
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-stone-500">
-              {savedRecording.extension === "mp4"
-                ? "Your browser created an MP4 file."
-                : "This browser records FLOAT as WebM rather than MP4."}
-            </p>
-            <label className="mt-6 block text-[10px] uppercase tracking-[0.3em] text-stone-500">
-              File name
-              <input
-                className="mt-3 w-full border border-stone-700 bg-black px-3 py-3 text-sm normal-case tracking-normal text-stone-200 outline-none transition focus:border-stone-400"
-                value={recordingName}
-                onChange={(event) => setRecordingName(event.target.value)}
-              />
-            </label>
-            <div className="mt-7 flex gap-3">
-              <button
-                type="button"
-                className="border border-stone-500 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-100 transition hover:bg-stone-800"
-                onClick={saveRecording}
-              >
-                Choose save location
-              </button>
-              <button
-                type="button"
-                className="px-3 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-600 transition hover:text-stone-300"
-                onClick={() => setSavedRecording(null)}
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {recordingError && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-5 backdrop-blur-sm">
-          <div className="w-full max-w-lg border border-stone-700 bg-[#11100e] p-6 text-stone-300 shadow-2xl">
-            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-              FLOAT recording unavailable
-            </p>
-            <p className="mt-5 text-sm leading-6 text-stone-300">
-              {recordingError}
-            </p>
-            <button
-              type="button"
-              className="mt-7 border border-stone-700 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-300 transition hover:border-stone-400 hover:text-white"
-              onClick={() => setRecordingError(null)}
-            >
-              Close
-            </button>
-          </div>
         </div>
       )}
 
@@ -1895,7 +1657,7 @@ export default function ArtifactImageExperience({
         </div>
       )}
 
-      {floating && floatVariant === "sleeve" && !recording && (
+      {floating && floatVariant === "sleeve" && (
         <div
           ref={floatRef}
           className={`elsewhere-float-sleeve-stage fixed inset-0 z-[80] overflow-hidden bg-[#050505] ${
@@ -1973,7 +1735,7 @@ export default function ArtifactImageExperience({
         </div>
       )}
 
-      {floating && (floatVariant === "classic" || recording) && (
+      {floating && floatVariant === "classic" && (
         <div
           ref={floatRef}
           className={`elsewhere-float-stage fixed inset-0 z-[80] overflow-hidden bg-black ${
@@ -2028,38 +1790,24 @@ export default function ArtifactImageExperience({
             ))}
           </div>
           <div aria-hidden className="elsewhere-float-analog-overlay absolute inset-0" />
-          {recording ? (
-            <FloatRecorder
-              height={recording.height}
-              images={images}
-              seed={floatSeed}
-              textures={sessionTextures}
-              width={recording.width}
-              onComplete={completeRecording}
-              onError={failRecording}
-            />
+          <div className="absolute left-5 top-5 z-30 text-[10px] uppercase tracking-[0.42em] text-stone-500">
+            Float / visual transmission
+          </div>
+          {returnHref ? (
+            <a
+              href={returnHref}
+              className="absolute right-5 top-5 z-30 border border-stone-700 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-stone-300 transition hover:border-stone-400 hover:text-white"
+            >
+              Return
+            </a>
           ) : (
-            <>
-              <div className="absolute left-5 top-5 z-30 text-[10px] uppercase tracking-[0.42em] text-stone-500">
-                Float / visual transmission
-              </div>
-              {returnHref ? (
-                <a
-                  href={returnHref}
-                  className="absolute right-5 top-5 z-30 border border-stone-700 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-stone-300 transition hover:border-stone-400 hover:text-white"
-                >
-                  Return
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  className="absolute right-5 top-5 z-30 border border-stone-700 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-stone-300 transition hover:border-stone-400 hover:text-white"
-                  onClick={() => setFloating(false)}
-                >
-                  Return
-                </button>
-              )}
-            </>
+            <button
+              type="button"
+              className="absolute right-5 top-5 z-30 border border-stone-700 bg-black/60 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-stone-300 transition hover:border-stone-400 hover:text-white"
+              onClick={() => setFloating(false)}
+            >
+              Return
+            </button>
           )}
         </div>
       )}

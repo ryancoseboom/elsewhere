@@ -1771,7 +1771,7 @@ button:hover > .elsewhere-archive-texture {
     "Arial Narrow",
     var(--font-geist-mono),
     monospace;
-  font-size: clamp(3.5rem, 12vw, 14rem) !important;
+  font-size: clamp(2.8rem, 9.6vw, 11.2rem) !important;
   font-stretch: condensed;
   font-weight: 700;
   line-height: 0.82 !important;
@@ -1803,6 +1803,21 @@ button:hover > .elsewhere-archive-texture {
   max-width: min(78vw, 68rem) !important;
   overflow-wrap: anywhere !important;
   white-space: normal !important;
+}
+
+@media (orientation: landscape) {
+  .elsewhere-memory-stage .elsewhere-memory-central__text {
+    max-width: 96vw !important;
+    overflow-wrap: normal !important;
+    text-wrap: nowrap !important;
+    white-space: nowrap !important;
+  }
+
+  .elsewhere-memory-stage .elsewhere-memory-central__text--contained {
+    max-width: 96vw !important;
+    overflow-wrap: normal !important;
+    white-space: nowrap !important;
+  }
 }
 
 .elsewhere-memory-ground {
@@ -2369,126 +2384,6 @@ button:hover > .elsewhere-archive-texture {
   font-size: 0.82rem;
   line-height: 1.7;
   color: rgba(168, 162, 158, 0.72);
-}
-
-.elsewhere-memory-recording-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.25rem;
-  background:
-    linear-gradient(180deg, rgba(7, 6, 4, 0.74), rgba(7, 6, 4, 0.92)),
-    url("/textures/float/folded-paper.jpg");
-  background-position: center;
-  background-size: cover;
-  color: rgb(245 245 244);
-}
-
-.elsewhere-memory-recording-modal::before {
-  position: absolute;
-  inset: 0;
-  background:
-    repeating-linear-gradient(
-      0deg,
-      rgba(245, 245, 244, 0.045) 0 1px,
-      transparent 1px 5px
-    ),
-    radial-gradient(circle at 20% 25%, rgba(185, 28, 28, 0.12), transparent 30%),
-    radial-gradient(circle at 76% 68%, rgba(168, 162, 158, 0.12), transparent 34%);
-  content: "";
-  mix-blend-mode: screen;
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.elsewhere-memory-recording-card {
-  position: relative;
-  z-index: 1;
-  width: min(31rem, 100%);
-  border: 1px solid rgba(168, 162, 158, 0.36);
-  background:
-    linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(28, 25, 23, 0.82)),
-    url("/textures/float/dust-scratches.jpg");
-  background-position: center;
-  background-size: cover;
-  box-shadow:
-    0 28px 90px rgba(0, 0, 0, 0.62),
-    inset 0 0 0 1px rgba(245, 245, 244, 0.035);
-  padding: clamp(1.35rem, 4vw, 2rem);
-}
-
-.elsewhere-memory-recording-card input {
-  border-radius: 0;
-}
-
-.elsewhere-memory-recorder {
-  position: fixed;
-  inset: 0;
-  z-index: 110;
-  overflow: hidden;
-  background: #000;
-}
-
-.elsewhere-memory-recorder canvas {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: contain !important;
-}
-
-.elsewhere-memory-stage--recording .elsewhere-memory-recording-modal {
-  display: none;
-}
-
-.elsewhere-memory-stage--recording-landscape .elsewhere-memory-central__text {
-  max-width: min(72vw, 64rem) !important;
-  font-size: clamp(3rem, 10vw, 11rem) !important;
-  line-height: 0.76 !important;
-}
-
-.elsewhere-memory-stage--recording-landscape .elsewhere-memory-caption {
-  bottom: clamp(2.25rem, 6vh, 4rem);
-}
-
-.elsewhere-memory-stage--recording-portrait .elsewhere-memory-catalog-strip {
-  right: 1rem;
-  left: 1rem;
-  font-size: clamp(0.38rem, 1.2vw, 0.58rem);
-}
-
-.elsewhere-memory-stage--recording-portrait .elsewhere-memory-table {
-  grid-template-rows: repeat(10, minmax(44px, 1fr));
-  gap: clamp(0.55rem, 2vw, 0.95rem);
-  min-height: 78vh;
-  margin-top: 3.25rem;
-}
-
-.elsewhere-memory-stage--recording-portrait .elsewhere-memory-central {
-  align-items: center;
-  padding-inline: 1rem;
-}
-
-.elsewhere-memory-stage--recording-portrait .elsewhere-memory-central__text {
-  max-width: 86vw !important;
-  font-size: clamp(2.35rem, 15vw, 7.8rem) !important;
-  line-height: 0.76 !important;
-}
-
-.elsewhere-memory-stage--recording-portrait .elsewhere-memory-caption {
-  bottom: clamp(4rem, 9vh, 6.5rem);
-  left: clamp(1rem, 5vw, 2rem);
-  max-width: min(22rem, 74vw);
-}
-
-.elsewhere-memory-stage--recording-portrait .elsewhere-memory-caption__countdown--stopwatch {
-  top: -1.7rem !important;
-  font-size: clamp(1rem, 4vw, 1.65rem) !important;
-}
-
-.elsewhere-memory-stage--recording-portrait .elsewhere-memory-caption h2 {
-  font-size: clamp(1.85rem, 9vw, 4rem);
 }
 
 .elsewhere-memory-debug {

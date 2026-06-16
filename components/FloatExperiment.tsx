@@ -12,7 +12,6 @@ import {
   ARCHIVE_TEXTURES,
   archiveTextureIndices,
 } from "@/lib/archive-textures";
-import FloatRecorder, { type FloatRecording } from "./FloatRecorder";
 
 export type FloatExperimentArtifact = {
   album: string | null;
@@ -91,33 +90,6 @@ type CatalogSignal = {
 
 type FloatPhase = "image" | "text" | "lyric" | "catalog";
 
-type RecordingDimensions = {
-  height: number;
-  label: string;
-  orientation: "landscape" | "portrait";
-  width: number;
-};
-
-type SaveFilePickerWindow = Window & {
-  showSaveFilePicker?: (options: {
-    suggestedName: string;
-    types: {
-      accept: Record<string, string[]>;
-      description: string;
-    }[];
-  }) => Promise<{
-    createWritable: () => Promise<{
-      close: () => Promise<void>;
-      write: (data: Blob) => Promise<void>;
-    }>;
-  }>;
-};
-
-type ShareNavigator = Navigator & {
-  canShare?: (data: ShareData & { files?: File[] }) => boolean;
-  share?: (data: ShareData & { files?: File[] }) => Promise<void>;
-};
-
 type RegisterFrame = {
   color: "black" | "gray" | "red" | "white";
   height: number;
@@ -151,21 +123,6 @@ const paragraphSlots = [
 ];
 
 const frameColors: RegisterFrame["color"][] = ["black", "gray", "white", "red"];
-
-const recordingDimensions: RecordingDimensions[] = [
-  {
-    height: 1080,
-    label: "Horizontal / 1920 x 1080",
-    orientation: "landscape",
-    width: 1920,
-  },
-  {
-    height: 1920,
-    label: "Vertical / 1080 x 1920",
-    orientation: "portrait",
-    width: 1080,
-  },
-];
 
 const layoutSlots = [
   {
@@ -1023,44 +980,12 @@ export default function FloatExperiment({
   const [phaseCycle, setPhaseCycle] = useState(0);
   const [textureCycle, setTextureCycle] = useState(0);
   const [rareEvent, setRareEvent] = useState(false);
-  const [recordingPrompt, setRecordingPrompt] = useState<"record" | "dimensions" | null>(
-    "record"
-  );
-  const [recording, setRecording] = useState<RecordingDimensions | null>(null);
-  const [recordingError, setRecordingError] = useState<string | null>(null);
-  const [savedRecording, setSavedRecording] = useState<FloatRecording | null>(null);
-  const [recordingName, setRecordingName] = useState("elsewhere-float");
   const [associationTargetTime, setAssociationTargetTime] = useState(0);
   const [clockNow, setClockNow] = useState(0);
   const [showIntro, setShowIntro] = useState(true);
   const [quiet, setQuiet] = useState(false);
   const reducedMotion = useReducedMotion();
   const phase = floatPhases[phaseCycle % floatPhases.length];
-  const recordingImages = useMemo(
-    () =>
-      artifacts
-        .filter((artifact) => artifact.image_url)
-        .map((artifact) => ({
-          alt: artifact.title,
-          src: artifact.image_url || "",
-        })),
-    [artifacts]
-  );
-  const recordingCentralTexts = useMemo(() => {
-    const lyrics = artifacts.flatMap((artifact) =>
-      lyricSignals(artifact).map((signal) => signal.text.toUpperCase())
-    );
-
-    return lyrics.length
-      ? lyrics
-      : artifacts
-          .flatMap((artifact) => sourceSignals(artifact).map((signal) => signal.text.toUpperCase()))
-          .slice(0, 12);
-  }, [artifacts]);
-  const recordingCaptionTitles = useMemo(
-    () => artifacts.map((artifact) => artifact.title).filter(Boolean),
-    [artifacts]
-  );
   const scene = useMemo(
     () => buildScene(artifacts, seed, imageCycle),
     [artifacts, imageCycle, seed]
@@ -1089,66 +1014,6 @@ export default function FloatExperiment({
     2,
     "0"
   )}.${String(associationCountdownMs % 1000).padStart(3, "0")}`;
-
-  async function saveRecording() {
-    if (!savedRecording) return;
-
-    const filename = `${recordingName.trim() || "elsewhere-float"}.${
-      savedRecording.extension
-    }`;
-    const picker = (window as SaveFilePickerWindow).showSaveFilePicker;
-
-    if (picker) {
-      try {
-        const handle = await picker({
-          suggestedName: filename,
-          types: [
-            {
-              accept: {
-                [savedRecording.mimeType || `video/${savedRecording.extension}`]: [
-                  `.${savedRecording.extension}`,
-                ],
-              },
-              description: `${savedRecording.extension.toUpperCase()} video`,
-            },
-          ],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(savedRecording.blob);
-        await writable.close();
-        setSavedRecording(null);
-        return;
-      } catch (error) {
-        if ((error as Error).name === "AbortError") return;
-      }
-    }
-
-    const file = new File([savedRecording.blob], filename, {
-      type: savedRecording.mimeType || `video/${savedRecording.extension}`,
-    });
-    const shareNavigator = navigator as ShareNavigator;
-
-    if (shareNavigator.share && shareNavigator.canShare?.({ files: [file] })) {
-      try {
-        await shareNavigator.share({
-          files: [file],
-          title: "Elsewhere Float",
-        });
-        setSavedRecording(null);
-        return;
-      } catch (error) {
-        if ((error as Error).name === "AbortError") return;
-      }
-    }
-
-    const url = URL.createObjectURL(savedRecording.blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setSavedRecording(null);
-  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => setShowIntro(false), 3_800);
@@ -1322,7 +1187,7 @@ export default function FloatExperiment({
 
   return (
     <main
-      className={`elsewhere-memory-stage min-h-screen overflow-hidden bg-[#070604] text-stone-200 ${ELSEWHERE_FLOAT_INTENSITY_V2 ? "elsewhere-memory-stage--intensity-v2" : ""} elsewhere-memory-stage--phase-${phase} ${rareEvent ? "elsewhere-memory-stage--rare-event" : ""} ${recording ? `elsewhere-memory-stage--recording elsewhere-memory-stage--recording-${recording.orientation}` : ""}`}
+      className={`elsewhere-memory-stage min-h-screen overflow-hidden bg-[#070604] text-stone-200 ${ELSEWHERE_FLOAT_INTENSITY_V2 ? "elsewhere-memory-stage--intensity-v2" : ""} elsewhere-memory-stage--phase-${phase} ${rareEvent ? "elsewhere-memory-stage--rare-event" : ""}`}
     >
       <div className="elsewhere-memory-ground" aria-hidden />
       <AtmosphericTextureLayers />
@@ -1493,166 +1358,6 @@ export default function FloatExperiment({
         </div>
       )}
 
-      {recordingPrompt && !recording && !savedRecording && (
-        <div className="elsewhere-memory-recording-modal fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-5">
-          <div className="elsewhere-memory-recording-card relative z-[1] w-full max-w-[31rem] border border-stone-500/40 bg-black/90 p-6 shadow-2xl">
-            {recordingPrompt === "record" ? (
-              <>
-                <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-                  Float / recording
-                </p>
-                <h2 className="mt-5 font-serif text-3xl text-stone-100">
-                  Record this Float?
-                </h2>
-                <p className="mt-3 text-sm leading-6 text-stone-500">
-                  A recording captures a 30-second transmission. You can choose
-                  horizontal or vertical before it starts.
-                </p>
-                <div className="mt-7 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    className="border border-stone-500 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-100 transition hover:bg-stone-800"
-                    onClick={() => setRecordingPrompt("dimensions")}
-                  >
-                    Record
-                  </button>
-                  <button
-                    type="button"
-                    className="border border-stone-700 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-400 transition hover:border-stone-500 hover:text-stone-100"
-                    onClick={() => setRecordingPrompt(null)}
-                  >
-                    Just Float
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-                  Record Float
-                </p>
-                <h2 className="mt-5 font-serif text-3xl text-stone-100">
-                  Choose orientation
-                </h2>
-                <p className="mt-3 text-sm leading-6 text-stone-500">
-                  The Float composition will rebalance for the selected frame.
-                </p>
-                <div className="mt-7 grid gap-3">
-                  {recordingDimensions.map((dimensions) => (
-                    <button
-                      key={dimensions.label}
-                      type="button"
-                      className="border border-stone-700 px-5 py-4 text-left text-[10px] uppercase tracking-[0.3em] text-stone-300 transition hover:border-stone-400 hover:bg-stone-900 hover:text-white"
-                      onClick={() => {
-                        setRecording(dimensions);
-                        setRecordingPrompt(null);
-                      }}
-                    >
-                      {dimensions.label}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className="mt-5 text-[10px] uppercase tracking-[0.32em] text-stone-600 transition hover:text-stone-300"
-                  onClick={() => setRecordingPrompt("record")}
-                >
-                  Back
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {recording && (
-        <div className="elsewhere-memory-recorder fixed inset-0 z-[110] overflow-hidden bg-black">
-          <FloatRecorder
-            captionText={
-              anchor?.artifact.fragment ||
-              anchor?.artifact.description ||
-              "A fragment came forward and pulled related material with it."
-            }
-            captionTitles={recordingCaptionTitles}
-            catalogSignals={catalogSignals.map((signal) => signal.text)}
-            centralTexts={recordingCentralTexts}
-            height={recording.height}
-            images={recordingImages}
-            seed={seed + 4401}
-            textures={ARCHIVE_TEXTURES}
-            width={recording.width}
-            onComplete={(completedRecording) => {
-              setRecording(null);
-              setSavedRecording(completedRecording);
-            }}
-            onError={(message) => {
-              setRecording(null);
-              setRecordingError(message);
-            }}
-          />
-        </div>
-      )}
-
-      {savedRecording && (
-        <div className="elsewhere-memory-recording-modal fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-5">
-          <div className="elsewhere-memory-recording-card relative z-[1] w-full max-w-[31rem] border border-stone-500/40 bg-black/90 p-6 shadow-2xl">
-            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-              Float recorded
-            </p>
-            <h2 className="mt-5 font-serif text-3xl text-stone-100">
-              Save the transmission
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-stone-500">
-              {savedRecording.extension === "mp4"
-                ? "Your browser created an MP4 file."
-                : "This browser recorded WebM. Some mobile apps may save it through Files or Share."}
-            </p>
-            <label className="mt-6 block text-[10px] uppercase tracking-[0.3em] text-stone-500">
-              File name
-              <input
-                className="mt-3 w-full border border-stone-700 bg-black px-3 py-3 text-sm normal-case tracking-normal text-stone-200 outline-none transition focus:border-stone-400"
-                value={recordingName}
-                onChange={(event) => setRecordingName(event.target.value)}
-              />
-            </label>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <button
-                type="button"
-                className="border border-stone-500 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-100 transition hover:bg-stone-800"
-                onClick={saveRecording}
-              >
-                Choose save location
-              </button>
-              <button
-                type="button"
-                className="px-3 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-600 transition hover:text-stone-300"
-                onClick={() => setSavedRecording(null)}
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {recordingError && (
-        <div className="elsewhere-memory-recording-modal fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-5">
-          <div className="elsewhere-memory-recording-card relative z-[1] w-full max-w-[31rem] border border-stone-500/40 bg-black/90 p-6 shadow-2xl">
-            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
-              Float recording unavailable
-            </p>
-            <p className="mt-5 text-sm leading-6 text-stone-300">
-              {recordingError}
-            </p>
-            <button
-              type="button"
-              className="mt-7 border border-stone-700 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-300 transition hover:border-stone-400 hover:text-white"
-              onClick={() => setRecordingError(null)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
