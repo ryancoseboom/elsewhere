@@ -198,7 +198,7 @@ export default async function BackroomMediaLabelsPage() {
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-7 text-stone-500">
             Rewrite image captions, video labels, and demo names in one place.
-            Changes save automatically after a short pause.
+            Edit a label, then save the item when it feels right.
           </p>
         </header>
 

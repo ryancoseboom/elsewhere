@@ -783,16 +783,18 @@ function MediaList({
 function AudioGallery({
   items,
   dropTargetArtifactId,
+  title = "Listen",
 }: {
   items: Artifact[];
   dropTargetArtifactId?: string;
+  title?: string;
 }) {
   if (items.length === 0 && !dropTargetArtifactId) return null;
 
   return (
     <section className="border-t border-stone-800 pt-6">
       <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
-        Listen
+        {title}
       </p>
       <div className="grid gap-4 md:grid-cols-2">
         {items.map((item) => (
@@ -1139,10 +1141,10 @@ function EditorialDossier({
               </p>
             )}
 
-            <MediaList
+            <AudioGallery
               title="Demo versions"
               items={demos}
-              placeholder="Demo versions can be attached here as child artifacts."
+              dropTargetArtifactId={canEdit ? artifact.id : undefined}
             />
             <MediaList
               title="Promotional material"
@@ -1164,6 +1166,7 @@ function EditorialDossier({
                 key={visualItems[index]?.id || `placeholder-${index}`}
                 item={visualItems[index]}
                 index={index}
+                dropTargetArtifactId={canEdit ? artifact.id : undefined}
               />
               )
             )}
@@ -1173,6 +1176,8 @@ function EditorialDossier({
         <VideoGallery
           items={videos}
           placeholder="Official videos, live fragments, and visual companions will collect here."
+          canEdit={canEdit}
+          dropTargetArtifactId={canEdit ? artifact.id : undefined}
         />
 
         <div className="mt-14">
@@ -1390,7 +1395,7 @@ function VisualScrapbook({
             )}
 
             <div className="mt-12 space-y-8">
-              {(isSongPage || isSingleRelease) && (
+              {(canEdit || isSongPage || isSingleRelease) && (
                 <AudioGallery
                   items={[
                     ...(artifact.audio_url ? [artifact] : []),
@@ -1400,23 +1405,18 @@ function VisualScrapbook({
                   dropTargetArtifactId={canEdit ? artifact.id : undefined}
                 />
               )}
-              {!isAlbumPage && !isSongPage && !isSingleRelease && (
+              {!canEdit && !isAlbumPage && !isSongPage && !isSingleRelease && (
                 <MediaList
                   title="Listen"
                   items={demos}
                   placeholder="Alternate recordings will appear here when attached."
-                  canEdit={canEdit}
                 />
               )}
               <VideoGallery
                 items={videos}
                 placeholder="Moving-image fragments will appear here when attached."
                 canEdit={canEdit}
-                dropTargetArtifactId={
-                  canEdit && (isAlbumPage || isSongPage || isSingleRelease)
-                    ? artifact.id
-                    : undefined
-                }
+                dropTargetArtifactId={canEdit ? artifact.id : undefined}
               />
               <MediaList
                 title="Paper traces"

@@ -16,10 +16,11 @@ export default function BackroomMediaLabelEditor({
     "idle"
   );
   const requestRef = useRef<AbortController | null>(null);
+  const hasChanges = value.trim() !== savedValue;
 
   const save = useCallback(
-    async (nextValue: string) => {
-      const normalizedValue = nextValue.trim();
+    async () => {
+      const normalizedValue = value.trim();
 
       if (!normalizedValue) {
         setErrorMessage("Add a label and try again.");
@@ -59,15 +60,8 @@ export default function BackroomMediaLabelEditor({
         setStatus("error");
       }
     },
-    [artifactId, savedValue]
+    [artifactId, savedValue, value]
   );
-
-  useEffect(() => {
-    if (value.trim() === savedValue) return;
-
-    const timer = window.setTimeout(() => void save(value), 650);
-    return () => window.clearTimeout(timer);
-  }, [save, savedValue, value]);
 
   useEffect(
     () => () => {
@@ -78,27 +72,36 @@ export default function BackroomMediaLabelEditor({
 
   return (
     <div className="min-w-0 flex-1">
-      <input
-        aria-label={`Edit label for ${savedValue}`}
-        className="w-full border-b border-stone-800 bg-transparent px-1 py-2 font-serif text-base text-stone-200 outline-none transition hover:border-stone-600 focus:border-stone-300"
-        onBlur={() => void save(value)}
-        onChange={(event) => {
-          setValue(event.target.value);
-          setErrorMessage("");
-          setStatus("idle");
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") event.currentTarget.blur();
-
-          if (event.key === "Escape") {
-            setValue(savedValue);
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <input
+          aria-label={`Edit label for ${savedValue}`}
+          className="min-w-0 flex-1 border-b border-stone-800 bg-transparent px-1 py-2 font-serif text-base text-stone-200 outline-none transition hover:border-stone-600 focus:border-stone-300"
+          onChange={(event) => {
+            setValue(event.target.value);
             setErrorMessage("");
             setStatus("idle");
-            event.currentTarget.blur();
-          }
-        }}
-        value={value}
-      />
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void save();
+
+            if (event.key === "Escape") {
+              setValue(savedValue);
+              setErrorMessage("");
+              setStatus("idle");
+              event.currentTarget.blur();
+            }
+          }}
+          value={value}
+        />
+        <button
+          type="button"
+          disabled={!hasChanges || status === "saving"}
+          onClick={() => void save()}
+          className="border border-stone-700 px-3 py-2 text-[9px] uppercase tracking-[0.2em] text-stone-400 transition hover:border-stone-400 hover:text-stone-100 disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          {status === "saving" ? "Saving" : "Save"}
+        </button>
+      </div>
       <p
         aria-live="polite"
         className={`mt-2 text-[9px] uppercase tracking-[0.2em] ${
@@ -108,7 +111,7 @@ export default function BackroomMediaLabelEditor({
         {status === "saving" && "Saving"}
         {status === "saved" && "Saved"}
         {status === "error" && errorMessage}
-        {status === "idle" && "Saves automatically"}
+        {status === "idle" && (hasChanges ? "Unsaved changes" : "Ready")}
       </p>
     </div>
   );

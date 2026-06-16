@@ -12,6 +12,7 @@ import {
   ARCHIVE_TEXTURES,
   archiveTextureIndices,
 } from "@/lib/archive-textures";
+import FloatRecorder, { type FloatRecording } from "./FloatRecorder";
 
 export type FloatExperimentArtifact = {
   album: string | null;
@@ -55,6 +56,7 @@ type MemoryPiece = {
   reasons: string[];
   rotate: number;
   textureIndices: number[];
+  tapeTextureIndex: number;
   top: number;
   treatment: "alive" | "faded" | "ghost";
   width: number;
@@ -87,6 +89,44 @@ type CatalogSignal = {
   seed: number;
 };
 
+type FloatPhase = "image" | "text" | "lyric" | "catalog";
+
+type RecordingDimensions = {
+  height: number;
+  label: string;
+  orientation: "landscape" | "portrait";
+  width: number;
+};
+
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (options: {
+    suggestedName: string;
+    types: {
+      accept: Record<string, string[]>;
+      description: string;
+    }[];
+  }) => Promise<{
+    createWritable: () => Promise<{
+      close: () => Promise<void>;
+      write: (data: Blob) => Promise<void>;
+    }>;
+  }>;
+};
+
+type ShareNavigator = Navigator & {
+  canShare?: (data: ShareData & { files?: File[] }) => boolean;
+  share?: (data: ShareData & { files?: File[] }) => Promise<void>;
+};
+
+type RegisterFrame = {
+  color: "black" | "gray" | "red" | "white";
+  height: number;
+  left: number;
+  opacity: number;
+  top: number;
+  width: number;
+};
+
 const ELSEWHERE_FLOAT_INTENSITY_V2 = true;
 const mutationGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#/*-+<>[]{}?";
 
@@ -97,6 +137,34 @@ const designPrinciples = [
   "overlap as remembered order",
   "recurrence without explanation",
   "damage as evidence, not decoration",
+];
+
+const floatPhases: FloatPhase[] = ["image", "text", "lyric", "catalog"];
+
+const paragraphSlots = [
+  { left: 6, top: 26 },
+  { left: 67, top: 30 },
+  { left: 13, top: 69 },
+  { left: 58, top: 76 },
+  { left: 35, top: 12 },
+  { left: 78, top: 58 },
+];
+
+const frameColors: RegisterFrame["color"][] = ["black", "gray", "white", "red"];
+
+const recordingDimensions: RecordingDimensions[] = [
+  {
+    height: 1080,
+    label: "Horizontal / 1920 x 1080",
+    orientation: "landscape",
+    width: 1920,
+  },
+  {
+    height: 1920,
+    label: "Vertical / 1080 x 1920",
+    orientation: "portrait",
+    width: 1080,
+  },
 ];
 
 const layoutSlots = [
@@ -473,6 +541,7 @@ function buildScene(
       principles: [],
       reasons,
       rotate: 0,
+      tapeTextureIndex: archiveTextureIndices(`${item.artifact.slug}:tape:${seed}:${cycle}:${index}`, 1)[0] || 0,
       textureIndices: archiveTextureIndices(`${item.artifact.slug}:${seed}:${cycle}:${index}`, 3),
       top: slot.top,
       treatment:
@@ -495,7 +564,8 @@ function buildTransmissionText(
   scene: MemoryPiece[],
   artifacts: FloatExperimentArtifact[],
   seed: number,
-  cycle: number
+  cycle: number,
+  phase: FloatPhase
 ) {
   const prioritized = [
     ...scene.map((piece) => piece.artifact),
@@ -511,7 +581,15 @@ function buildTransmissionText(
     { reason: "fallback corrupted caption", source: "system", text: "DO NOT TRUST THE IMAGE" },
   ];
   const signals = pool.length ? pool : fallback;
-  const count = ELSEWHERE_FLOAT_INTENSITY_V2 ? 96 : 8;
+  const count = ELSEWHERE_FLOAT_INTENSITY_V2
+    ? phase === "text"
+      ? 124
+      : phase === "catalog"
+        ? 108
+        : phase === "lyric"
+          ? 88
+          : 72
+    : 8;
   const classes = [
     "elsewhere-memory-text--micro",
     "elsewhere-memory-text--small",
@@ -525,12 +603,14 @@ function buildTransmissionText(
     const textSeed = seed + cycle * 509 + index * 73;
     const signal =
       signals[Math.floor(seededUnit(textSeed + 1) * signals.length)] || fallback[0];
-    const isParagraph = index % 17 === 4 || index % 23 === 9;
+    const paragraphCadence = phase === "text" ? 9 : phase === "catalog" ? 13 : 19;
+    const isParagraph =
+      index > 2 && (index % paragraphCadence === 4 || index % (paragraphCadence + 7) === 9);
     const sizeIndex = Math.min(
       classes.length - 1,
       Math.floor(Math.pow(seededUnit(textSeed + 2), 2.4) * classes.length)
     );
-    const paragraphLines = Array.from({ length: 3 }, (_, lineIndex) => {
+    const paragraphLines = Array.from({ length: phase === "text" ? 4 : 3 }, (_, lineIndex) => {
       const lineSignal =
         signals[Math.floor(seededUnit(textSeed + 19 + lineIndex * 11) * signals.length)] ||
         fallback[0];
@@ -541,7 +621,9 @@ function buildTransmissionText(
     return {
       blur: seededUnit(textSeed + 3) < 0.18 ? seededRange(textSeed + 4, 0.4, 2.8) : 0,
       className: isParagraph ? "elsewhere-memory-text--paragraph" : classes[sizeIndex],
-      left: seededRange(textSeed + 5, -7, 93),
+      left: isParagraph
+        ? paragraphSlots[index % paragraphSlots.length].left
+        : seededRange(textSeed + 5, -7, 93),
       mutate: seededUnit(textSeed + 6) > 0.28,
       opacity: isParagraph
         ? seededRange(textSeed + 7, 0.18, 0.42)
@@ -552,7 +634,9 @@ function buildTransmissionText(
       text: isParagraph
         ? paragraphLines.join("\n")
         : clip(signal.text.toUpperCase(), sizeIndex > 3 ? 54 : 92),
-      top: seededRange(textSeed + 9, 5, 88),
+      top: isParagraph
+        ? paragraphSlots[index % paragraphSlots.length].top
+        : seededRange(textSeed + 9, 5, 88),
       zIndex: seededUnit(textSeed + 10) > 0.48 ? 24 : 6,
     } satisfies TransmissionText;
   });
@@ -599,22 +683,70 @@ function buildCatalogSignals(
   });
 }
 
+function buildRegisterFrames(seed: number, cycle: number, phase: FloatPhase) {
+  const frameCount = phase === "image" ? 7 : phase === "catalog" ? 5 : 4;
+
+  return Array.from({ length: frameCount }, (_, index) => {
+    const frameSeed = seed + cycle * 421 + index * 67;
+    const slot = layoutSlots[Math.floor(seededUnit(frameSeed + 1) * layoutSlots.length)];
+
+    return {
+      color: frameColors[Math.floor(seededUnit(frameSeed + 2) * frameColors.length)] || "gray",
+      height: Math.max(7, slot.height + seededRange(frameSeed + 3, -5, 8)),
+      left: Math.max(0, Math.min(94, slot.left + seededRange(frameSeed + 4, -4.5, 5.5))),
+      opacity: seededRange(frameSeed + 5, 0.2, 0.74),
+      top: Math.max(1, Math.min(90, slot.top + seededRange(frameSeed + 6, -4.5, 5.5))),
+      width: Math.max(5, slot.width + seededRange(frameSeed + 7, -4, 7)),
+    } satisfies RegisterFrame;
+  });
+}
+
+function lyricStrength(text: string) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  const length = normalized.length;
+  let score = 0;
+
+  if (length >= 14 && length <= 46) score += 16;
+  else if (length >= 8 && length <= 62) score += 8;
+  else score -= 8;
+
+  if (/[?!]/.test(normalized)) score += 5;
+  if (/[,;:]/.test(normalized)) score += 2;
+  if (/\b(i|you|we|me|my|your|our|this|there|never|always|down|out|inside|open|dark|light)\b/i.test(normalized)) {
+    score += 7;
+  }
+  if (normalized.split(/\s+/).length <= 7) score += 5;
+  if (/[()[\]{}/*<>]/.test(normalized)) score += 3;
+
+  return score;
+}
+
 function centralSignal(
   artifacts: FloatExperimentArtifact[],
   seed: number,
   cycle: number
 ) {
-  const pool = artifacts.flatMap(lyricSignals);
+  const pool = artifacts
+    .flatMap(lyricSignals)
+    .map((signal, index) => ({
+      ...signal,
+      index,
+      score: lyricStrength(signal.text) + seededRange(seed + cycle * 97 + index * 31, 0, 7),
+    }))
+    .sort((left, right) => right.score - left.score);
 
   if (pool.length === 0) return null;
 
-  let signalIndex = Math.floor(seededUnit(seed + cycle * 811 + 811) * pool.length);
+  const candidateCount = Math.min(pool.length, 8);
+  let signalIndex = Math.floor(seededUnit(seed + cycle * 811 + 811) * candidateCount);
 
-  if (cycle > 0 && pool.length > 1) {
-    const previousIndex = Math.floor(seededUnit(seed + (cycle - 1) * 811 + 811) * pool.length);
+  if (cycle > 0 && candidateCount > 1) {
+    const previousIndex = Math.floor(
+      seededUnit(seed + (cycle - 1) * 811 + 811) * candidateCount
+    );
 
     if (signalIndex === previousIndex) {
-      signalIndex = (signalIndex + 1) % pool.length;
+      signalIndex = (signalIndex + 1) % candidateCount;
     }
   }
 
@@ -742,6 +874,30 @@ function CatalogSignalStrip({
   );
 }
 
+function RegisterFrameLayer({ frames }: { frames: RegisterFrame[] }) {
+  return (
+    <div className="elsewhere-memory-register-frames" aria-hidden>
+      {frames.map((frame, index) => {
+        const style = {
+          "--memory-frame-height": `${fixed(frame.height)}%`,
+          "--memory-frame-left": cssPercent(frame.left),
+          "--memory-frame-opacity": cssNumber(frame.opacity),
+          "--memory-frame-top": cssPercent(frame.top),
+          "--memory-frame-width": `${fixed(frame.width)}%`,
+        } as CSSProperties;
+
+        return (
+          <span
+            className={`elsewhere-memory-register-frame elsewhere-memory-register-frame--${frame.color}`}
+            key={`${frame.left}-${frame.top}-${index}`}
+            style={style}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) {
   const treatment =
     piece.treatment === "alive"
@@ -781,6 +937,28 @@ function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) 
     "--memory-brightness": `${fixed(treatment.brightness)}%`,
     "--memory-contrast": `${fixed(treatment.contrast)}%`,
     "--memory-image-rotate": cssDegrees(piece.imageRotate),
+    "--memory-texture-opacity-a": cssNumber(seededRange(seed + 21, 0.025, 0.11)),
+    "--memory-texture-opacity-b": cssNumber(seededRange(seed + 22, 0.03, 0.14)),
+    "--memory-texture-opacity-c": cssNumber(seededRange(seed + 23, 0.02, 0.09)),
+    "--memory-texture-rotate-a": cssDegrees([0, 90, 180, 270][Math.floor(seededUnit(seed + 24) * 4)] || 0),
+    "--memory-texture-rotate-b": cssDegrees([0, 90, 180, 270][Math.floor(seededUnit(seed + 25) * 4)] || 0),
+    "--memory-texture-rotate-c": cssDegrees([0, 90, 180, 270][Math.floor(seededUnit(seed + 26) * 4)] || 0),
+    "--memory-texture-scale-a": cssNumber(seededRange(seed + 27, 1.2, 2.8)),
+    "--memory-texture-scale-b": cssNumber(seededRange(seed + 28, 1.35, 3.2)),
+    "--memory-texture-scale-c": cssNumber(seededRange(seed + 29, 1.6, 3.6)),
+    "--memory-texture-x-a": cssPercent(seededRange(seed + 30, -40, 40)),
+    "--memory-texture-x-b": cssPercent(seededRange(seed + 31, -45, 45)),
+    "--memory-texture-x-c": cssPercent(seededRange(seed + 32, -50, 50)),
+    "--memory-texture-y-a": cssPercent(seededRange(seed + 33, -40, 40)),
+    "--memory-texture-y-b": cssPercent(seededRange(seed + 34, -45, 45)),
+    "--memory-texture-y-c": cssPercent(seededRange(seed + 35, -50, 50)),
+    "--memory-tape-brightness": `${fixed(seededRange(seed + 36, 72, 135))}%`,
+    "--memory-tape-contrast": `${fixed(seededRange(seed + 37, 90, 190))}%`,
+    "--memory-tape-opacity": cssNumber(seededRange(seed + 38, 0.24, 0.62)),
+    "--memory-tape-position-x": cssPercent(seededRange(seed + 39, 0, 100)),
+    "--memory-tape-position-y": cssPercent(seededRange(seed + 40, 0, 100)),
+    "--memory-tape-rotate": cssDegrees(seededRange(seed + 41, -7, 7)),
+    "--memory-tape-scale": cssNumber(seededRange(seed + 42, 1.1, 3.8)),
   } as CSSProperties;
 
   return (
@@ -789,7 +967,10 @@ function MemoryPieceCard({ piece, seed }: { piece: MemoryPiece; seed: number }) 
       className={`elsewhere-memory-piece group ${piece.isAnchor ? "is-anchor" : ""} ${piece.isTiny ? "is-tiny" : ""}`}
       style={style}
     >
-      <span className="elsewhere-memory-tape" aria-hidden />
+      <span
+        className={`elsewhere-memory-tape elsewhere-memory-tape--varied elsewhere-memory-texture--${piece.tapeTextureIndex}`}
+        aria-hidden
+      />
       <span className="elsewhere-memory-photo">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={piece.artifact.image_url || ""} alt={piece.artifact.title} />
@@ -839,23 +1020,63 @@ export default function FloatExperiment({
   const [imageCycle, setImageCycle] = useState(0);
   const [textCycle, setTextCycle] = useState(0);
   const [centralCycle, setCentralCycle] = useState(0);
+  const [phaseCycle, setPhaseCycle] = useState(0);
+  const [textureCycle, setTextureCycle] = useState(0);
+  const [rareEvent, setRareEvent] = useState(false);
+  const [recordingPrompt, setRecordingPrompt] = useState<"record" | "dimensions" | null>(
+    "record"
+  );
+  const [recording, setRecording] = useState<RecordingDimensions | null>(null);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [savedRecording, setSavedRecording] = useState<FloatRecording | null>(null);
+  const [recordingName, setRecordingName] = useState("elsewhere-float");
   const [associationTargetTime, setAssociationTargetTime] = useState(0);
   const [clockNow, setClockNow] = useState(0);
   const [showIntro, setShowIntro] = useState(true);
   const [quiet, setQuiet] = useState(false);
   const reducedMotion = useReducedMotion();
+  const phase = floatPhases[phaseCycle % floatPhases.length];
+  const recordingImages = useMemo(
+    () =>
+      artifacts
+        .filter((artifact) => artifact.image_url)
+        .map((artifact) => ({
+          alt: artifact.title,
+          src: artifact.image_url || "",
+        })),
+    [artifacts]
+  );
+  const recordingCentralTexts = useMemo(() => {
+    const lyrics = artifacts.flatMap((artifact) =>
+      lyricSignals(artifact).map((signal) => signal.text.toUpperCase())
+    );
+
+    return lyrics.length
+      ? lyrics
+      : artifacts
+          .flatMap((artifact) => sourceSignals(artifact).map((signal) => signal.text.toUpperCase()))
+          .slice(0, 12);
+  }, [artifacts]);
+  const recordingCaptionTitles = useMemo(
+    () => artifacts.map((artifact) => artifact.title).filter(Boolean),
+    [artifacts]
+  );
   const scene = useMemo(
     () => buildScene(artifacts, seed, imageCycle),
     [artifacts, imageCycle, seed]
   );
   const anchor = scene[0];
   const transmissionText = useMemo(
-    () => buildTransmissionText(scene, artifacts, seed, textCycle),
-    [artifacts, scene, seed, textCycle]
+    () => buildTransmissionText(scene, artifacts, seed, textCycle, phase),
+    [artifacts, phase, scene, seed, textCycle]
   );
   const catalogSignals = useMemo(
     () => buildCatalogSignals(artifacts, seed, textCycle),
     [artifacts, seed, textCycle]
+  );
+  const registerFrames = useMemo(
+    () => buildRegisterFrames(seed, textureCycle, phase),
+    [phase, seed, textureCycle]
   );
   const central = useMemo(
     () => centralSignal(artifacts, seed, centralCycle),
@@ -868,6 +1089,66 @@ export default function FloatExperiment({
     2,
     "0"
   )}.${String(associationCountdownMs % 1000).padStart(3, "0")}`;
+
+  async function saveRecording() {
+    if (!savedRecording) return;
+
+    const filename = `${recordingName.trim() || "elsewhere-float"}.${
+      savedRecording.extension
+    }`;
+    const picker = (window as SaveFilePickerWindow).showSaveFilePicker;
+
+    if (picker) {
+      try {
+        const handle = await picker({
+          suggestedName: filename,
+          types: [
+            {
+              accept: {
+                [savedRecording.mimeType || `video/${savedRecording.extension}`]: [
+                  `.${savedRecording.extension}`,
+                ],
+              },
+              description: `${savedRecording.extension.toUpperCase()} video`,
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(savedRecording.blob);
+        await writable.close();
+        setSavedRecording(null);
+        return;
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+      }
+    }
+
+    const file = new File([savedRecording.blob], filename, {
+      type: savedRecording.mimeType || `video/${savedRecording.extension}`,
+    });
+    const shareNavigator = navigator as ShareNavigator;
+
+    if (shareNavigator.share && shareNavigator.canShare?.({ files: [file] })) {
+      try {
+        await shareNavigator.share({
+          files: [file],
+          title: "Elsewhere Float",
+        });
+        setSavedRecording(null);
+        return;
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+      }
+    }
+
+    const url = URL.createObjectURL(savedRecording.blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setSavedRecording(null);
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => setShowIntro(false), 3_800);
@@ -886,6 +1167,59 @@ export default function FloatExperiment({
     let step = 0;
 
     const schedule = () => {
+      const delay = seededRange(seed + step * 71 + 41, 20_000, 40_000);
+
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        setPhaseCycle((current) => current + 1);
+        step += 1;
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [reducedMotion, seed]);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    let cancelled = false;
+    let timer = 0;
+    let releaseTimer = 0;
+    let step = 0;
+
+    const schedule = () => {
+      const delay = seededRange(seed + step * 83 + 53, 18_000, 36_000);
+
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        setRareEvent(true);
+        releaseTimer = window.setTimeout(() => setRareEvent(false), 1650);
+        step += 1;
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      window.clearTimeout(releaseTimer);
+    };
+  }, [reducedMotion, seed]);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    let cancelled = false;
+    let timer = 0;
+    let step = 0;
+
+    const schedule = () => {
       const delay = quiet
         ? seededRange(seed + step * 31 + 5, 9_000, 15_000)
         : seededRange(seed + step * 31 + 5, 5_800, 12_400);
@@ -894,6 +1228,33 @@ export default function FloatExperiment({
       timer = window.setTimeout(() => {
         if (cancelled) return;
         setImageCycle((current) => current + 1);
+        step += 1;
+        schedule();
+      }, delay);
+    };
+
+    schedule();
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [quiet, reducedMotion, seed]);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    let cancelled = false;
+    let timer = 0;
+    let step = 0;
+
+    const schedule = () => {
+      const delay = quiet
+        ? seededRange(seed + step * 47 + 23, 2_400, 5_200)
+        : seededRange(seed + step * 47 + 23, 850, 2_900);
+
+      timer = window.setTimeout(() => {
+        if (cancelled) return;
+        setTextureCycle((current) => current + 1);
         step += 1;
         schedule();
       }, delay);
@@ -960,7 +1321,9 @@ export default function FloatExperiment({
   }, [quiet, reducedMotion, seed]);
 
   return (
-    <main className={`elsewhere-memory-stage min-h-screen overflow-hidden bg-[#070604] text-stone-200 ${ELSEWHERE_FLOAT_INTENSITY_V2 ? "elsewhere-memory-stage--intensity-v2" : ""}`}>
+    <main
+      className={`elsewhere-memory-stage min-h-screen overflow-hidden bg-[#070604] text-stone-200 ${ELSEWHERE_FLOAT_INTENSITY_V2 ? "elsewhere-memory-stage--intensity-v2" : ""} elsewhere-memory-stage--phase-${phase} ${rareEvent ? "elsewhere-memory-stage--rare-event" : ""} ${recording ? `elsewhere-memory-stage--recording elsewhere-memory-stage--recording-${recording.orientation}` : ""}`}
+    >
       <div className="elsewhere-memory-ground" aria-hidden />
       <AtmosphericTextureLayers />
       {ELSEWHERE_FLOAT_INTENSITY_V2 && (
@@ -970,6 +1333,7 @@ export default function FloatExperiment({
             reducedMotion={reducedMotion}
             signals={catalogSignals}
           />
+          <RegisterFrameLayer frames={registerFrames} />
           <div className="elsewhere-memory-text-field" aria-hidden>
             {transmissionText.map((signal, index) => (
               <TransmissionTextLayer
@@ -1020,7 +1384,7 @@ export default function FloatExperiment({
             <MemoryPieceCard
               key={`${piece.artifact.id}-${imageCycle}-${index}`}
               piece={piece}
-              seed={seed + imageCycle * 37 + index * 11}
+              seed={seed + imageCycle * 37 + textureCycle * 101 + index * 11}
             />
           ))}
           {anchor && (
@@ -1040,11 +1404,7 @@ export default function FloatExperiment({
         </div>
 
         <footer className="relative z-40 flex flex-wrap items-end justify-between gap-4 border-t border-stone-900/80 pt-4">
-          <p className="max-w-xl text-xs leading-6 text-stone-600">
-            This version lets artifacts overload the channel: images rotate,
-            captions corrupt, lyrics surface, and meaning keeps breaking through
-            the noise.
-          </p>
+          <span aria-hidden />
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
@@ -1061,6 +1421,8 @@ export default function FloatExperiment({
                 setAssociationTargetTime(Date.now());
                 setTextCycle((current) => current + 1);
                 setCentralCycle((current) => current + 1);
+                setPhaseCycle((current) => current + 1);
+                setTextureCycle((current) => current + 1);
               }}
             >
               Remember Again
@@ -1113,6 +1475,10 @@ export default function FloatExperiment({
                   <span className="text-stone-600">Text layers:</span>{" "}
                   {transmissionText.length}; mutation enabled selectively
                 </p>
+                <p className="mt-2 text-xs leading-5 text-stone-500">
+                  <span className="text-stone-600">Chapter:</span>{" "}
+                  {phase}; rare event {rareEvent ? "active" : "idle"}
+                </p>
               </article>
             )}
           </div>
@@ -1124,6 +1490,167 @@ export default function FloatExperiment({
           <p className="max-w-md text-sm leading-7 text-stone-500">
             The archive has not revealed any public images yet.
           </p>
+        </div>
+      )}
+
+      {recordingPrompt && !recording && !savedRecording && (
+        <div className="elsewhere-memory-recording-modal fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-5">
+          <div className="elsewhere-memory-recording-card relative z-[1] w-full max-w-[31rem] border border-stone-500/40 bg-black/90 p-6 shadow-2xl">
+            {recordingPrompt === "record" ? (
+              <>
+                <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
+                  Float / recording
+                </p>
+                <h2 className="mt-5 font-serif text-3xl text-stone-100">
+                  Record this Float?
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-stone-500">
+                  A recording captures a 30-second transmission. You can choose
+                  horizontal or vertical before it starts.
+                </p>
+                <div className="mt-7 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    className="border border-stone-500 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-100 transition hover:bg-stone-800"
+                    onClick={() => setRecordingPrompt("dimensions")}
+                  >
+                    Record
+                  </button>
+                  <button
+                    type="button"
+                    className="border border-stone-700 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-400 transition hover:border-stone-500 hover:text-stone-100"
+                    onClick={() => setRecordingPrompt(null)}
+                  >
+                    Just Float
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
+                  Record Float
+                </p>
+                <h2 className="mt-5 font-serif text-3xl text-stone-100">
+                  Choose orientation
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-stone-500">
+                  The Float composition will rebalance for the selected frame.
+                </p>
+                <div className="mt-7 grid gap-3">
+                  {recordingDimensions.map((dimensions) => (
+                    <button
+                      key={dimensions.label}
+                      type="button"
+                      className="border border-stone-700 px-5 py-4 text-left text-[10px] uppercase tracking-[0.3em] text-stone-300 transition hover:border-stone-400 hover:bg-stone-900 hover:text-white"
+                      onClick={() => {
+                        setRecording(dimensions);
+                        setRecordingPrompt(null);
+                      }}
+                    >
+                      {dimensions.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="mt-5 text-[10px] uppercase tracking-[0.32em] text-stone-600 transition hover:text-stone-300"
+                  onClick={() => setRecordingPrompt("record")}
+                >
+                  Back
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {recording && (
+        <div className="elsewhere-memory-recorder fixed inset-0 z-[110] overflow-hidden bg-black">
+          <FloatRecorder
+            captionText={
+              anchor?.artifact.fragment ||
+              anchor?.artifact.description ||
+              "A fragment came forward and pulled related material with it."
+            }
+            captionTitles={recordingCaptionTitles}
+            catalogSignals={catalogSignals.map((signal) => signal.text)}
+            centralTexts={recordingCentralTexts}
+            height={recording.height}
+            images={recordingImages}
+            seed={seed + 4401}
+            textures={ARCHIVE_TEXTURES}
+            width={recording.width}
+            onComplete={(completedRecording) => {
+              setRecording(null);
+              setSavedRecording(completedRecording);
+            }}
+            onError={(message) => {
+              setRecording(null);
+              setRecordingError(message);
+            }}
+          />
+        </div>
+      )}
+
+      {savedRecording && (
+        <div className="elsewhere-memory-recording-modal fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-5">
+          <div className="elsewhere-memory-recording-card relative z-[1] w-full max-w-[31rem] border border-stone-500/40 bg-black/90 p-6 shadow-2xl">
+            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
+              Float recorded
+            </p>
+            <h2 className="mt-5 font-serif text-3xl text-stone-100">
+              Save the transmission
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-stone-500">
+              {savedRecording.extension === "mp4"
+                ? "Your browser created an MP4 file."
+                : "This browser recorded WebM. Some mobile apps may save it through Files or Share."}
+            </p>
+            <label className="mt-6 block text-[10px] uppercase tracking-[0.3em] text-stone-500">
+              File name
+              <input
+                className="mt-3 w-full border border-stone-700 bg-black px-3 py-3 text-sm normal-case tracking-normal text-stone-200 outline-none transition focus:border-stone-400"
+                value={recordingName}
+                onChange={(event) => setRecordingName(event.target.value)}
+              />
+            </label>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="border border-stone-500 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-100 transition hover:bg-stone-800"
+                onClick={saveRecording}
+              >
+                Choose save location
+              </button>
+              <button
+                type="button"
+                className="px-3 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-600 transition hover:text-stone-300"
+                onClick={() => setSavedRecording(null)}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {recordingError && (
+        <div className="elsewhere-memory-recording-modal fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-5">
+          <div className="elsewhere-memory-recording-card relative z-[1] w-full max-w-[31rem] border border-stone-500/40 bg-black/90 p-6 shadow-2xl">
+            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-500">
+              Float recording unavailable
+            </p>
+            <p className="mt-5 text-sm leading-6 text-stone-300">
+              {recordingError}
+            </p>
+            <button
+              type="button"
+              className="mt-7 border border-stone-700 px-5 py-3 text-[10px] uppercase tracking-[0.32em] text-stone-300 transition hover:border-stone-400 hover:text-white"
+              onClick={() => setRecordingError(null)}
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </main>

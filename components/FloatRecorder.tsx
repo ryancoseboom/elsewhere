@@ -14,6 +14,10 @@ type FloatRecording = {
 };
 
 type FloatRecorderProps = {
+  captionText?: string;
+  captionTitles?: string[];
+  catalogSignals?: string[];
+  centralTexts?: string[];
   height: number;
   images: FloatImage[];
   seed: number;
@@ -52,10 +56,9 @@ type ImageLayer = {
 };
 
 const recordingDuration = 30_000;
-const gridColumns = 12;
-const gridRows = 8;
 const recordingImageLimit = 20;
 const recordingTextureLimit = 7;
+const mutationGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#/*-+<>[]{}?";
 
 function seededUnit(seed: number) {
   const value = Math.sin(seed * 9187.17) * 10000;
@@ -178,6 +181,41 @@ function makeMaskedTexture(image: HTMLImageElement) {
   return canvas;
 }
 
+function mutateText(text: string, seed: number, tick: number, intensity: number) {
+  return Array.from(text)
+    .map((char, index) => {
+      if (char === " ") return " ";
+
+      const unit = seededUnit(seed + tick * 41 + index * 19);
+      if (unit > intensity) return char;
+
+      return mutationGlyphs[
+        Math.floor(seededUnit(seed + tick * 53 + index * 29) * mutationGlyphs.length)
+      ] || char;
+    })
+    .join("");
+}
+
+function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: number) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+
+  words.forEach((word) => {
+    const testLine = line ? `${line} ${word}` : word;
+
+    if (context.measureText(testLine).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = testLine;
+    }
+  });
+
+  if (line) lines.push(line);
+  return lines.slice(0, 4);
+}
+
 function makeMaskedImage(image: HTMLImageElement, aspectRatio = 1) {
   const canvas = document.createElement("canvas");
   const size = 1024;
@@ -199,36 +237,26 @@ function makeMaskedImage(image: HTMLImageElement, aspectRatio = 1) {
     canvas.height
   );
   context.filter = "none";
-  context.globalCompositeOperation = "destination-in";
-
-  const gradient = context.createRadialGradient(
-    canvas.width / 2,
-    canvas.height / 2,
-    Math.min(canvas.width, canvas.height) * 0.14,
-    canvas.width / 2,
-    canvas.height / 2,
-    Math.max(canvas.width, canvas.height) * 0.56
-  );
-  gradient.addColorStop(0, "rgba(0, 0, 0, 1)");
-  gradient.addColorStop(0.58, "rgba(0, 0, 0, 0.82)");
-  gradient.addColorStop(0.82, "rgba(0, 0, 0, 0.3)");
-  gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, canvas.height);
 
   return canvas;
 }
 
-function packTiles(seed: number, imageCount: number, textureCount: number) {
+function packTiles(
+  seed: number,
+  imageCount: number,
+  textureCount: number,
+  gridColumns: number,
+  gridRows: number
+) {
   const occupied = Array.from({ length: gridRows }, () =>
     Array.from({ length: gridColumns }, () => false)
   );
   const tiles: CanvasTile[] = [];
 
-  for (let index = 0; index < 24; index += 1) {
+  for (let index = 0; index < (gridColumns > gridRows ? 24 : 28); index += 1) {
     const tileSeed = seed + index * 7 + 101;
-    const requestedColumnSpan = tileSpan(tileSeed + 29, 8);
-    const requestedRowSpan = tileSpan(tileSeed + 30, 7);
+    const requestedColumnSpan = tileSpan(tileSeed + 29, Math.min(8, gridColumns));
+    const requestedRowSpan = tileSpan(tileSeed + 30, Math.min(7, gridRows));
     let placed = false;
 
     for (let row = 0; row < gridRows && !placed; row += 1) {
@@ -306,6 +334,10 @@ function getRecordingFormat() {
 }
 
 export default function FloatRecorder({
+  captionText,
+  captionTitles = [],
+  catalogSignals = [],
+  centralTexts = [],
   height,
   images,
   seed,
@@ -363,16 +395,25 @@ export default function FloatRecorder({
       }
 
       const maskedTextures = availableTextures.map(makeMaskedTexture);
-      const tiles = packTiles(seed, availableImages.length, maskedTextures.length);
+      const isPortrait = height > width;
+      const gridColumns = isPortrait ? 8 : 12;
+      const gridRows = isPortrait ? 12 : 8;
+      const tiles = packTiles(
+        seed,
+        availableImages.length,
+        maskedTextures.length,
+        gridColumns,
+        gridRows
+      );
       const layers = Array.from({ length: 9 }, (_, index): TextureLayer => {
         const layerSeed = seed + index * 31 + 701;
 
         return {
-          column: Math.floor(seededRange(layerSeed + 1, 0, 9)),
-          columnSpan: Math.floor(seededRange(layerSeed + 2, 4, 11)),
+          column: Math.floor(seededRange(layerSeed + 1, 0, Math.max(1, gridColumns - 3))),
+          columnSpan: Math.floor(seededRange(layerSeed + 2, 3, gridColumns + 1)),
           phase: seededRange(layerSeed + 3, 0, Math.PI * 2),
-          row: Math.floor(seededRange(layerSeed + 4, 0, 7)),
-          rowSpan: Math.floor(seededRange(layerSeed + 5, 3, 9)),
+          row: Math.floor(seededRange(layerSeed + 4, 0, Math.max(1, gridRows - 2))),
+          rowSpan: Math.floor(seededRange(layerSeed + 5, 3, gridRows + 1)),
           textureOffset: Math.floor(seededUnit(layerSeed + 6) * maskedTextures.length),
         };
       });
@@ -380,12 +421,12 @@ export default function FloatRecorder({
         const layerSeed = seed + index * 47 + 1701;
 
         return {
-          column: Math.floor(seededRange(layerSeed + 1, 0, 9)),
-          columnSpan: Math.floor(seededRange(layerSeed + 2, 5, 13)),
+          column: Math.floor(seededRange(layerSeed + 1, 0, Math.max(1, gridColumns - 3))),
+          columnSpan: Math.floor(seededRange(layerSeed + 2, 4, gridColumns + 1)),
           imageOffset: Math.floor(seededUnit(layerSeed + 3) * availableImages.length),
           phase: seededRange(layerSeed + 4, 0, Math.PI * 2),
-          row: Math.floor(seededRange(layerSeed + 5, 0, 7)),
-          rowSpan: Math.floor(seededRange(layerSeed + 6, 4, 10)),
+          row: Math.floor(seededRange(layerSeed + 5, 0, Math.max(1, gridRows - 3))),
+          rowSpan: Math.floor(seededRange(layerSeed + 6, 4, gridRows + 1)),
         };
       });
       const maskedImages = availableImages.map((image) => makeMaskedImage(image, 1.25));
@@ -393,12 +434,19 @@ export default function FloatRecorder({
       const gap = Math.max(8, Math.round(Math.min(width, height) * 0.008));
       const cellWidth = width / gridColumns;
       const cellHeight = height / gridRows;
+      const fallbackCentral = ["SIGNAL LOSS / STILL LISTENING"];
+      const centralPool = centralTexts.length ? centralTexts : fallbackCentral;
+      const titlePool = captionTitles.length ? captionTitles : images.map((image) => image.alt);
+      const catalogPool = catalogSignals.length
+        ? catalogSignals
+        : ["ELSEWHERE / FLOAT -- ARCHIVE / SIGNAL -- MEMORY / INDEX"];
 
       function draw(now: number) {
         if (stopped) return;
 
         const elapsed = now - startedAt;
         const seconds = elapsed / 1000;
+        const tick = Math.floor(seconds * 5);
         drawingContext.globalCompositeOperation = "source-over";
         drawingContext.globalAlpha = 1;
         drawingContext.fillStyle = "#000";
@@ -436,11 +484,11 @@ export default function FloatRecorder({
             panY
           );
 
-          if (maskedTextures.length > 0) {
-            drawingContext.globalCompositeOperation = "screen";
-            drawingContext.globalAlpha = 0.06 + Math.sin(seconds * 2.1 + tile.phase) * 0.035;
-            drawCoverImage(
-              drawingContext,
+            if (maskedTextures.length > 0) {
+              drawingContext.globalCompositeOperation = "screen";
+              drawingContext.globalAlpha = 0.06 + Math.sin(seconds * 2.1 + tile.phase) * 0.035;
+              drawCoverImage(
+                drawingContext,
               maskedTextures[tile.textureIndex],
               maskedTextures[tile.textureIndex].width,
               maskedTextures[tile.textureIndex].height,
@@ -453,6 +501,22 @@ export default function FloatRecorder({
 
           drawingContext.restore();
         });
+
+        drawingContext.save();
+        drawingContext.globalCompositeOperation = "screen";
+        drawingContext.textAlign = "left";
+        drawingContext.textBaseline = "top";
+        drawingContext.font = `${Math.max(12, Math.round(width * 0.007))}px "Courier New", monospace`;
+        drawingContext.fillStyle = "rgba(168, 162, 158, 0.42)";
+        catalogPool.slice(0, 4).forEach((line, index) => {
+          drawingContext.fillText(
+            mutateText(line.toUpperCase(), seed + index * 73, tick, 0.12),
+            Math.round(width * 0.035),
+            Math.round(height * 0.024 + index * Math.max(15, height * 0.014)),
+            Math.round(width * 0.88)
+          );
+        });
+        drawingContext.restore();
 
         drawingContext.globalCompositeOperation = "screen";
         imageLayers.forEach((layer, index) => {
@@ -505,6 +569,82 @@ export default function FloatRecorder({
           });
         }
 
+        for (let index = 0; index < 5; index += 1) {
+          const frameSeed = seed + index * 79 + Math.floor(seconds / 2.4) * 199;
+          const color = ["rgba(0,0,0,0.72)", "rgba(168,162,158,0.54)", "rgba(245,245,244,0.54)", "rgba(185,28,28,0.68)"][
+            Math.floor(seededUnit(frameSeed + 1) * 4)
+          ];
+
+          drawingContext.save();
+          drawingContext.globalCompositeOperation = "source-over";
+          drawingContext.globalAlpha = seededRange(frameSeed + 2, 0.18, 0.62);
+          drawingContext.strokeStyle = color || "rgba(168,162,158,0.54)";
+          drawingContext.lineWidth = Math.max(1, Math.round(Math.min(width, height) * 0.001));
+          drawingContext.strokeRect(
+            width * seededRange(frameSeed + 3, 0.04, 0.82),
+            height * seededRange(frameSeed + 4, 0.06, 0.78),
+            width * seededRange(frameSeed + 5, 0.08, isPortrait ? 0.42 : 0.26),
+            height * seededRange(frameSeed + 6, 0.06, isPortrait ? 0.22 : 0.32)
+          );
+          drawingContext.restore();
+        }
+
+        const centralIndex = Math.floor(seconds / 7) % centralPool.length;
+        const centralText = mutateText(
+          centralPool[centralIndex]?.toUpperCase() || fallbackCentral[0],
+          seed + centralIndex * 97,
+          tick,
+          0.16
+        );
+        const centralFontSize = Math.round(
+          isPortrait ? Math.min(width * 0.13, height * 0.06) : Math.min(width * 0.075, height * 0.14)
+        );
+
+        drawingContext.save();
+        drawingContext.globalCompositeOperation = "source-over";
+        drawingContext.globalAlpha = 1;
+        drawingContext.textAlign = "center";
+        drawingContext.textBaseline = "middle";
+        drawingContext.font = `700 ${centralFontSize}px "OCR A Std", "Arial Narrow", "Courier New", monospace`;
+        drawingContext.fillStyle = "rgb(245, 245, 244)";
+        const centralLines = wrapText(drawingContext, centralText, width * (isPortrait ? 0.84 : 0.72));
+        const lineHeight = centralFontSize * 0.76;
+        const centerY = height * (isPortrait ? 0.48 : 0.5);
+        centralLines.forEach((line, index) => {
+          drawingContext.fillText(
+            line,
+            width / 2,
+            centerY + (index - (centralLines.length - 1) / 2) * lineHeight,
+            width * 1.18
+          );
+        });
+        drawingContext.restore();
+
+        const titleIndex = Math.floor(seconds / 6) % Math.max(1, titlePool.length);
+        const title = titlePool[titleIndex] || "current association";
+        const remaining = Math.max(0, 6 - (seconds % 6));
+        const secondsPart = Math.floor(remaining);
+        const millisecondsPart = Math.floor((remaining - secondsPart) * 1000);
+        const countdown = `${String(secondsPart).padStart(2, "0")}.${String(millisecondsPart).padStart(3, "0")}`;
+
+        drawingContext.save();
+        drawingContext.globalCompositeOperation = "source-over";
+        drawingContext.textAlign = "left";
+        drawingContext.textBaseline = "alphabetic";
+        drawingContext.fillStyle = "rgb(245, 245, 244)";
+        drawingContext.font = `700 ${Math.round(Math.min(width, height) * 0.035)}px "Courier New", monospace`;
+        drawingContext.fillText(countdown, width * 0.045, height * (isPortrait ? 0.82 : 0.77));
+        drawingContext.font = `${Math.round(Math.min(width, height) * 0.055)}px Georgia, serif`;
+        drawingContext.fillText(title, width * 0.045, height * (isPortrait ? 0.87 : 0.84), width * 0.58);
+        if (captionText) {
+          drawingContext.font = `${Math.round(Math.min(width, height) * 0.014)}px Georgia, serif`;
+          drawingContext.fillStyle = "rgba(168, 162, 158, 0.72)";
+          wrapText(drawingContext, captionText, width * 0.42).slice(0, 2).forEach((line, index) => {
+            drawingContext.fillText(line, width * 0.045, height * (isPortrait ? 0.9 : 0.88) + index * Math.round(height * 0.025));
+          });
+        }
+        drawingContext.restore();
+
         if (progressRef.current) {
           progressRef.current.style.width = `${Math.min(100, (elapsed / recordingDuration) * 100)}%`;
         }
@@ -538,7 +678,19 @@ export default function FloatRecorder({
       stream.getTracks().forEach((track) => track.stop());
       if (recorder.state !== "inactive") recorder.stop();
     };
-  }, [height, images, onComplete, onError, seed, textures, width]);
+  }, [
+    captionText,
+    captionTitles,
+    catalogSignals,
+    centralTexts,
+    height,
+    images,
+    onComplete,
+    onError,
+    seed,
+    textures,
+    width,
+  ]);
 
   return (
     <>

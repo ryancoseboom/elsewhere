@@ -1488,6 +1488,77 @@ button:hover > .elsewhere-archive-texture {
     #070604;
 }
 
+.elsewhere-memory-stage--phase-image .elsewhere-memory-table {
+  filter: contrast(112%) saturate(112%);
+}
+
+.elsewhere-memory-stage--phase-image .elsewhere-memory-text-field {
+  opacity: 0.68;
+}
+
+.elsewhere-memory-stage--phase-image .elsewhere-memory-central {
+  opacity: 0.82;
+}
+
+.elsewhere-memory-stage--phase-text .elsewhere-memory-table {
+  opacity: 0.72;
+  filter: contrast(92%) saturate(84%);
+}
+
+.elsewhere-memory-stage--phase-text .elsewhere-memory-text-field {
+  opacity: 1;
+}
+
+.elsewhere-memory-stage--phase-text .elsewhere-memory-central {
+  opacity: 0.74;
+}
+
+.elsewhere-memory-stage--phase-lyric .elsewhere-memory-table {
+  opacity: 0.78;
+  filter: grayscale(18%) contrast(96%);
+}
+
+.elsewhere-memory-stage--phase-lyric .elsewhere-memory-text-field {
+  opacity: 0.62;
+}
+
+.elsewhere-memory-stage--phase-lyric .elsewhere-memory-central {
+  opacity: 1;
+}
+
+.elsewhere-memory-stage--phase-catalog .elsewhere-memory-table {
+  opacity: 0.76;
+  filter: contrast(88%) brightness(82%);
+}
+
+.elsewhere-memory-stage--phase-catalog .elsewhere-memory-text-field {
+  opacity: 0.78;
+}
+
+.elsewhere-memory-stage--phase-catalog .elsewhere-memory-catalog-strip {
+  opacity: 1;
+}
+
+.elsewhere-memory-stage--rare-event .elsewhere-memory-broadcast {
+  opacity: 0.58;
+}
+
+.elsewhere-memory-stage--rare-event .elsewhere-memory-catalog-strip {
+  color: rgba(245, 245, 244, 0.68);
+}
+
+.elsewhere-memory-stage--rare-event .elsewhere-memory-piece.is-anchor .elsewhere-memory-photo img {
+  filter:
+    grayscale(0%)
+    contrast(128%)
+    brightness(112%)
+    saturate(165%);
+}
+
+.elsewhere-memory-stage--rare-event .elsewhere-memory-central__text {
+  color: color-mix(in srgb, #ef4444 18%, rgb(245 245 244)) !important;
+}
+
 .elsewhere-memory-broadcast,
 .elsewhere-memory-catalog-strip,
 .elsewhere-memory-text-field,
@@ -1541,6 +1612,7 @@ button:hover > .elsewhere-archive-texture {
 .elsewhere-memory-text-field {
   z-index: 28;
   overflow: hidden;
+  transition: opacity 1800ms ease;
 }
 
 .elsewhere-memory-catalog-strip {
@@ -1559,6 +1631,42 @@ button:hover > .elsewhere-archive-texture {
   line-height: 1.35;
   text-transform: uppercase;
   mix-blend-mode: screen;
+  transition: opacity 1800ms ease;
+}
+
+.elsewhere-memory-register-frames {
+  position: fixed;
+  inset: 0;
+  z-index: 31;
+  pointer-events: none;
+}
+
+.elsewhere-memory-register-frame {
+  position: absolute;
+  left: var(--memory-frame-left);
+  top: var(--memory-frame-top);
+  width: var(--memory-frame-width);
+  height: var(--memory-frame-height);
+  border: 1px solid currentColor;
+  opacity: var(--memory-frame-opacity);
+  transform: translate3d(-0.32rem, 0.22rem, 0);
+  animation: elsewhere-memory-register-frame 1800ms steps(2, end) both;
+}
+
+.elsewhere-memory-register-frame--black {
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.elsewhere-memory-register-frame--gray {
+  color: rgba(168, 162, 158, 0.58);
+}
+
+.elsewhere-memory-register-frame--red {
+  color: rgba(185, 28, 28, 0.72);
+}
+
+.elsewhere-memory-register-frame--white {
+  color: rgba(245, 245, 244, 0.62);
 }
 
 .elsewhere-memory-catalog-strip__line {
@@ -1649,6 +1757,7 @@ button:hover > .elsewhere-archive-texture {
   overflow: hidden;
   padding: 2rem;
   mix-blend-mode: normal;
+  transition: opacity 1800ms ease;
 }
 
 .elsewhere-memory-central__text {
@@ -1665,7 +1774,7 @@ button:hover > .elsewhere-archive-texture {
   font-size: clamp(3.5rem, 12vw, 14rem) !important;
   font-stretch: condensed;
   font-weight: 700;
-  line-height: 1.08 !important;
+  line-height: 0.82 !important;
   letter-spacing: 0.08em;
   text-align: center;
   text-transform: uppercase;
@@ -1714,6 +1823,9 @@ button:hover > .elsewhere-archive-texture {
   grid-template-rows: repeat(8, minmax(50px, 1fr));
   gap: clamp(0.75rem, 1.15vw, 1.25rem);
   min-height: 68vh;
+  transition:
+    filter 1800ms ease,
+    opacity 1800ms ease;
 }
 
 .elsewhere-memory-piece {
@@ -1735,6 +1847,9 @@ button:hover > .elsewhere-archive-texture {
   transform: rotate(0deg);
   transform-origin: 48% 42%;
   animation: elsewhere-memory-arrive 2200ms cubic-bezier(0.2, 0.65, 0.16, 1) both;
+  transition:
+    filter 1600ms ease,
+    opacity 1600ms ease;
 }
 
 .elsewhere-memory-piece.is-anchor {
@@ -1770,12 +1885,28 @@ button:hover > .elsewhere-archive-texture {
 
 .elsewhere-memory-image-texture:nth-of-type(2) {
   mix-blend-mode: multiply;
-  opacity: 0.08;
+  opacity: var(--memory-texture-opacity-a);
+  transform:
+    translate3d(var(--memory-texture-x-a), var(--memory-texture-y-a), 0)
+    rotate(var(--memory-texture-rotate-a))
+    scale(var(--memory-texture-scale-a));
 }
 
 .elsewhere-memory-image-texture:nth-of-type(3) {
   background-size: 150% 150%;
-  opacity: 0.045;
+  opacity: var(--memory-texture-opacity-b);
+  transform:
+    translate3d(var(--memory-texture-x-b), var(--memory-texture-y-b), 0)
+    rotate(var(--memory-texture-rotate-b))
+    scale(var(--memory-texture-scale-b));
+}
+
+.elsewhere-memory-image-texture:nth-of-type(4) {
+  opacity: var(--memory-texture-opacity-c);
+  transform:
+    translate3d(var(--memory-texture-x-c), var(--memory-texture-y-c), 0)
+    rotate(var(--memory-texture-rotate-c))
+    scale(var(--memory-texture-scale-c));
 }
 
 .elsewhere-memory-texture--0 {
@@ -1969,14 +2100,163 @@ button:hover > .elsewhere-archive-texture {
   z-index: 5;
   width: 35%;
   height: 24px;
-  background-image: url("/textures/float/masking-tape.jpg");
-  background-position: center;
-  background-size: cover;
+  background-position: var(--memory-tape-position-x) var(--memory-tape-position-y);
+  background-size:
+    calc(100% * var(--memory-tape-scale))
+    calc(100% * var(--memory-tape-scale));
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.34);
-  filter: grayscale(35%) brightness(88%) contrast(108%);
+  filter:
+    grayscale(45%)
+    brightness(var(--memory-tape-brightness))
+    contrast(var(--memory-tape-contrast));
   mix-blend-mode: screen;
-  opacity: 0.52;
-  transform: rotate(-2deg);
+  opacity: var(--memory-tape-opacity);
+  transform: rotate(var(--memory-tape-rotate));
+}
+
+.elsewhere-memory-tape--varied {
+  background-position: var(--memory-tape-position-x) var(--memory-tape-position-y) !important;
+  background-size:
+    calc(100% * var(--memory-tape-scale))
+    calc(100% * var(--memory-tape-scale)) !important;
+  opacity: var(--memory-tape-opacity) !important;
+  transform: rotate(var(--memory-tape-rotate)) !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--0 {
+  background-image: url("/textures/float/327f441e6660d823d1c4a1c02d13f421.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--1 {
+  background-image: url("/textures/float/5cb2fad072a5e73efa48051829a91f99-1.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--2 {
+  background-image: url("/textures/float/5cb2fad072a5e73efa48051829a91f99.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--3 {
+  background-image: url("/textures/float/8fd4016d739440f3c1b6548123584ddd-1.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--4 {
+  background-image: url("/textures/float/8fd4016d739440f3c1b6548123584ddd.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--5 {
+  background-image: url("/textures/float/Texturelabs_Atmosphere_129S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--6 {
+  background-image: url("/textures/float/Texturelabs_Concrete_129S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--7 {
+  background-image: url("/textures/float/Texturelabs_Concrete_146S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--8 {
+  background-image: url("/textures/float/Texturelabs_Concrete_176S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--9 {
+  background-image: url("/textures/float/Texturelabs_Details_129S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--10 {
+  background-image: url("/textures/float/Texturelabs_Film_138S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--11 {
+  background-image: url("/textures/float/Texturelabs_Grunge_195S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--12 {
+  background-image: url("/textures/float/Texturelabs_Grunge_300S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--13 {
+  background-image: url("/textures/float/Texturelabs_InkPaint_217S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--14 {
+  background-image: url("/textures/float/Texturelabs_Metal_122S-1.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--15 {
+  background-image: url("/textures/float/Texturelabs_Metal_122S.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--16 {
+  background-image: url("/textures/float/ab251eb803c68091699755e1929c0d6f.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--17 {
+  background-image: url("/textures/float/black-scratches.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--18 {
+  background-image: url("/textures/float/blur-grunge.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--19 {
+  background-image: url("/textures/float/dust-scratches.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--20 {
+  background-image: url("/textures/float/ece9d3bc6b95d3a43b0654073c057fd2.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--21 {
+  background-image: url("/textures/float/ed31ef77bdfc4df37daa07abb929ae49.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--22 {
+  background-image: url("/textures/float/fingerprint-smudge.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--23 {
+  background-image: url("/textures/float/flare-noise.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--24 {
+  background-image: url("/textures/float/folded-paper.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--25 {
+  background-image: url("/textures/float/halftone-noise.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--26 {
+  background-image: url("/textures/float/masking-tape.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--27 {
+  background-image: url("/textures/float/photocopy-noise.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--28 {
+  background-image: url("/textures/float/rip-noise.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--29 {
+  background-image: url("/textures/float/scrape.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--30 {
+  background-image: url("/textures/float/text-noise.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--31 {
+  background-image: url("/textures/float/texture-background-1100x733.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--32 {
+  background-image: url("/textures/float/torn-paper-edge.jpg") !important;
+}
+
+.elsewhere-memory-tape--varied.elsewhere-memory-texture--33 {
+  background-image: url("/textures/float/vhs-noise.jpg") !important;
 }
 
 .elsewhere-memory-label {
@@ -2091,6 +2371,126 @@ button:hover > .elsewhere-archive-texture {
   color: rgba(168, 162, 158, 0.72);
 }
 
+.elsewhere-memory-recording-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background:
+    linear-gradient(180deg, rgba(7, 6, 4, 0.74), rgba(7, 6, 4, 0.92)),
+    url("/textures/float/folded-paper.jpg");
+  background-position: center;
+  background-size: cover;
+  color: rgb(245 245 244);
+}
+
+.elsewhere-memory-recording-modal::before {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(245, 245, 244, 0.045) 0 1px,
+      transparent 1px 5px
+    ),
+    radial-gradient(circle at 20% 25%, rgba(185, 28, 28, 0.12), transparent 30%),
+    radial-gradient(circle at 76% 68%, rgba(168, 162, 158, 0.12), transparent 34%);
+  content: "";
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.elsewhere-memory-recording-card {
+  position: relative;
+  z-index: 1;
+  width: min(31rem, 100%);
+  border: 1px solid rgba(168, 162, 158, 0.36);
+  background:
+    linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(28, 25, 23, 0.82)),
+    url("/textures/float/dust-scratches.jpg");
+  background-position: center;
+  background-size: cover;
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.62),
+    inset 0 0 0 1px rgba(245, 245, 244, 0.035);
+  padding: clamp(1.35rem, 4vw, 2rem);
+}
+
+.elsewhere-memory-recording-card input {
+  border-radius: 0;
+}
+
+.elsewhere-memory-recorder {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  overflow: hidden;
+  background: #000;
+}
+
+.elsewhere-memory-recorder canvas {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+}
+
+.elsewhere-memory-stage--recording .elsewhere-memory-recording-modal {
+  display: none;
+}
+
+.elsewhere-memory-stage--recording-landscape .elsewhere-memory-central__text {
+  max-width: min(72vw, 64rem) !important;
+  font-size: clamp(3rem, 10vw, 11rem) !important;
+  line-height: 0.76 !important;
+}
+
+.elsewhere-memory-stage--recording-landscape .elsewhere-memory-caption {
+  bottom: clamp(2.25rem, 6vh, 4rem);
+}
+
+.elsewhere-memory-stage--recording-portrait .elsewhere-memory-catalog-strip {
+  right: 1rem;
+  left: 1rem;
+  font-size: clamp(0.38rem, 1.2vw, 0.58rem);
+}
+
+.elsewhere-memory-stage--recording-portrait .elsewhere-memory-table {
+  grid-template-rows: repeat(10, minmax(44px, 1fr));
+  gap: clamp(0.55rem, 2vw, 0.95rem);
+  min-height: 78vh;
+  margin-top: 3.25rem;
+}
+
+.elsewhere-memory-stage--recording-portrait .elsewhere-memory-central {
+  align-items: center;
+  padding-inline: 1rem;
+}
+
+.elsewhere-memory-stage--recording-portrait .elsewhere-memory-central__text {
+  max-width: 86vw !important;
+  font-size: clamp(2.35rem, 15vw, 7.8rem) !important;
+  line-height: 0.76 !important;
+}
+
+.elsewhere-memory-stage--recording-portrait .elsewhere-memory-caption {
+  bottom: clamp(4rem, 9vh, 6.5rem);
+  left: clamp(1rem, 5vw, 2rem);
+  max-width: min(22rem, 74vw);
+}
+
+.elsewhere-memory-stage--recording-portrait .elsewhere-memory-caption__countdown--stopwatch {
+  top: -1.7rem !important;
+  font-size: clamp(1rem, 4vw, 1.65rem) !important;
+}
+
+.elsewhere-memory-stage--recording-portrait .elsewhere-memory-caption h2 {
+  font-size: clamp(1.85rem, 9vw, 4rem);
+}
+
 .elsewhere-memory-debug {
   position: fixed;
   top: 0;
@@ -2179,6 +2579,24 @@ button:hover > .elsewhere-archive-texture {
 
   52% {
     opacity: 0.11;
+  }
+}
+
+@keyframes elsewhere-memory-register-frame {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 100% 100% 0);
+  }
+
+  18%,
+  78% {
+    opacity: var(--memory-frame-opacity);
+    clip-path: inset(0 0 0 0);
+  }
+
+  100% {
+    opacity: 0;
+    clip-path: inset(100% 0 0 100%);
   }
 }
 
