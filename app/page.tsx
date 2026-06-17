@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { connection } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { shuffle } from "@/lib/archive-navigation";
+import { createPublicClient } from "@/lib/supabase/server";
 
 type BackdropArtifact = {
   image_url: string | null;
@@ -28,8 +26,7 @@ const routes = [
 ];
 
 export default async function Home() {
-  await connection();
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("artifacts")
     .select("slug, title, image_url")
@@ -37,14 +34,13 @@ export default async function Home() {
     .eq("discovery_visibility", "public")
     .not("image_url", "is", null)
     .limit(120);
-  const backdrop = shuffle(
-    ((data || []) as BackdropArtifact[]).filter((artifact) =>
-      artifact.image_url?.trim()
-    )
-  ).slice(0, 12);
+  const backdrop = ((data || []) as BackdropArtifact[])
+    .filter((artifact) => artifact.image_url?.trim())
+    .sort((left, right) => left.slug.localeCompare(right.slug))
+    .slice(0, 12);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#090807] px-6 py-8 text-stone-200">
+    <main className="relative min-h-screen overflow-hidden bg-[#090807] px-4 py-5 text-stone-200 sm:px-6 sm:py-8">
       <div className="absolute inset-0 opacity-55">
         <div className="grid h-full grid-cols-4 grid-rows-3 gap-1 p-1 md:grid-cols-6">
           {backdrop.map((artifact, index) => (
@@ -65,16 +61,16 @@ export default async function Home() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(9,8,7,0.22),rgba(9,8,7,0.91)_72%)]" />
       <div className="absolute inset-0 bg-black/25" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col justify-between">
+      <div className="relative mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-6xl flex-col justify-between sm:min-h-[calc(100vh-4rem)]">
         <p className="text-[10px] uppercase tracking-[0.48em] text-stone-600">
           Elsewhere / Halou
         </p>
 
-        <section className="max-w-3xl py-16">
+        <section className="max-w-3xl py-12 sm:py-16">
           <p className="text-[10px] uppercase tracking-[0.58em] text-stone-600">
             An unstable archive
           </p>
-          <h1 className="mt-6 font-serif text-7xl leading-none text-stone-100 md:text-[10rem]">
+          <h1 className="mt-6 font-serif text-6xl leading-none text-stone-100 sm:text-7xl md:text-[10rem]">
             Elsewhere
           </h1>
           <p className="mt-7 max-w-xl text-sm leading-7 text-stone-500 md:text-base">
@@ -82,12 +78,12 @@ export default async function Home() {
             correct point of entry.
           </p>
 
-          <nav className="mt-14 grid gap-px bg-stone-800/70 md:grid-cols-3">
+          <nav className="mt-10 grid gap-px bg-stone-800/70 sm:mt-14 md:grid-cols-3">
             {routes.map((route, index) => (
               <Link
                 key={route.href}
                 href={route.href}
-                className="group bg-[#0e0d0b]/95 p-6 transition hover:bg-stone-900/95 md:min-h-52"
+                className="group bg-[#0e0d0b]/95 p-5 transition hover:bg-stone-900/95 sm:p-6 md:min-h-52"
               >
                 <p className="text-[9px] uppercase tracking-[0.32em] text-stone-700">
                   0{index + 1}

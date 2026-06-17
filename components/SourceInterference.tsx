@@ -1,9 +1,11 @@
 import type { CSSProperties } from "react";
+import { getLaunchInterferenceSnippets } from "@/lib/launch-interference";
 import { createClient } from "@/lib/supabase/server";
 import {
   getSourceInterferenceSnippets,
   SOURCE_INTERFERENCE_ENABLED,
   type SourceInterferenceContext,
+  type SourceInterferenceSnippet,
 } from "@/lib/source-artifacts";
 
 function seededUnit(seed: string) {
@@ -13,6 +15,26 @@ function seededUnit(seed: string) {
   );
 
   return Math.abs(Math.sin(total * 12.9898) * 43758.5453) % 1;
+}
+
+function fallbackSnippets(
+  context: SourceInterferenceContext,
+  limit: number
+): SourceInterferenceSnippet[] {
+  const fragments = [
+    context.artifactSlug && `artifact signal / ${context.artifactSlug}`,
+    context.room && `room interference / ${context.room.replaceAll("-", " ")}`,
+    context.motif && `motif recurrence / ${context.motif}`,
+    ...(context.motifs || []).map((motif) => `motif recurrence / ${motif}`),
+    ...(context.atmosphere || []).map((mood) => `atmosphere drift / ${mood}`),
+  ].filter((fragment): fragment is string => Boolean(fragment));
+
+  return fragments.slice(0, limit).map((fragment, index) => ({
+    sourceTitle: "Elsewhere archive",
+    sourceUrl: `/drift/${context.artifactSlug || "coco"}?signal=${index}`,
+    text: fragment,
+    tone: "internal fragment / unresolved",
+  }));
 }
 
 export default async function SourceInterference({
@@ -27,11 +49,16 @@ export default async function SourceInterference({
   if (!SOURCE_INTERFERENCE_ENABLED) return null;
 
   const supabase = await createClient();
-  const snippets = await getSourceInterferenceSnippets({
+  const sourceSnippets = await getSourceInterferenceSnippets({
     context,
     limit,
     supabase,
   });
+  const snippets = [
+    ...sourceSnippets,
+    ...getLaunchInterferenceSnippets(context, limit),
+    ...fallbackSnippets(context, limit),
+  ].slice(0, limit);
 
   if (snippets.length === 0) return null;
 

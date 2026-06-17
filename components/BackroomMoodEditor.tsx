@@ -58,11 +58,6 @@ function uniqueMoods(values: string[]) {
   return moods;
 }
 
-function removeMoods(current: string[], removals: string[]) {
-  const removalSet = new Set(removals.map((mood) => mood.toLowerCase()));
-  return current.filter((mood) => !removalSet.has(mood.toLowerCase()));
-}
-
 export default function BackroomMoodEditor({
   initialSongs,
 }: {

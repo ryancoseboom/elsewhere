@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import crypto from "crypto";
 import TitleSlugFields from "@/components/TitleSlugFields";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
+import DriftMoodCheckboxes from "@/components/DriftMoodCheckboxes";
+import { cleanDriftMoods } from "@/lib/drift-moods";
 import { spotifyUrl } from "@/lib/spotify";
 import { artifactVisibility } from "@/lib/artifact-visibility";
 
@@ -32,6 +34,7 @@ type Artifact = {
   spotify_url: string | null;
   private_notes: string | null;
   discovery_visibility: string | null;
+  drift_moods: string[] | null;
   lyrics: string | null;
   album: string | null;
   year: string | null;
@@ -241,6 +244,7 @@ async function createCopiedArtifact(formData: FormData) {
     motifs: splitList(formData.get("motifs")),
     rooms: splitList(formData.get("rooms")),
     nearby: splitList(formData.get("nearby")),
+    drift_moods: cleanDriftMoods(formData.getAll("drift_moods")),
 
     image_url,
     audio_url,
@@ -339,7 +343,7 @@ export default async function CopyArtifactPage({
   const { data: artifact, error } = await supabase
     .from("artifacts")
     .select(
-      "id, slug, title, parent_slug, kind, artifact_type, parent_id, band_id, album_id, song_id, sort_order, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, private_notes, discovery_visibility, lyrics, album, year, era, is_public"
+      "id, slug, title, parent_slug, kind, artifact_type, parent_id, band_id, album_id, song_id, sort_order, description, fragment, atmosphere, motifs, rooms, nearby, drift_moods, image_url, audio_url, video_url, youtube_url, private_notes, discovery_visibility, lyrics, album, year, era, is_public"
     )
     .eq("slug", slug)
     .single();
@@ -592,6 +596,8 @@ export default async function CopyArtifactPage({
                 className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
               />
             </div>
+
+            <DriftMoodCheckboxes defaultValue={item.drift_moods} />
 
             <div>
               <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">

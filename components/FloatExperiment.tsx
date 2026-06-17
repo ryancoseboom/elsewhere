@@ -12,6 +12,10 @@ import {
   ARCHIVE_TEXTURES,
   archiveTextureIndices,
 } from "@/lib/archive-textures";
+import {
+  FLOAT_CONTROL_DEFAULTS,
+  type FloatControlValues,
+} from "@/lib/float-controls";
 
 export type FloatExperimentArtifact = {
   album: string | null;
@@ -36,6 +40,14 @@ export type FloatExperimentArtifact = {
   song_id: string | null;
   title: string;
   year: string | null;
+};
+
+export type FloatVideoFormat = "youtube" | "instagram";
+
+export type FloatInterferenceSignal = {
+  reason: string;
+  source: string;
+  text: string;
 };
 
 type MemoryPiece = {
@@ -101,15 +113,6 @@ type RegisterFrame = {
 
 const ELSEWHERE_FLOAT_INTENSITY_V2 = true;
 const mutationGlyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#/*-+<>[]{}?";
-
-const designPrinciples = [
-  "stillness over spectacle",
-  "association instead of navigation",
-  "labels as archive residue",
-  "overlap as remembered order",
-  "recurrence without explanation",
-  "damage as evidence, not decoration",
-];
 
 const floatPhases: FloatPhase[] = ["image", "text", "lyric", "catalog"];
 
@@ -197,12 +200,12 @@ const layoutSlots = [
     width: 10,
     widthCss: "100%",
   },
-  { align: "center", gridColumn: "4", gridRow: "1", height: 8, heightCss: "72px", justify: "center", left: 29, top: 72, width: 7, widthCss: "72px" },
-  { align: "end", gridColumn: "8", gridRow: "8", height: 6, heightCss: "58px", justify: "center", left: 79, top: 76, width: 6, widthCss: "58px" },
-  { align: "center", gridColumn: "12", gridRow: "8", height: 5, heightCss: "50px", justify: "center", left: 50, top: 6, width: 5, widthCss: "50px" },
-  { align: "center", gridColumn: "1", gridRow: "5", height: 9, heightCss: "84px", justify: "center", left: 91, top: 62, width: 7, widthCss: "84px" },
-  { align: "center", gridColumn: "7", gridRow: "1", height: 7, heightCss: "64px", justify: "center", left: 18, top: 81, width: 6, widthCss: "64px" },
-  { align: "center", gridColumn: "4", gridRow: "8", height: 5, heightCss: "50px", justify: "center", left: 3, top: 38, width: 5, widthCss: "50px" },
+  { align: "center", gridColumn: "4", gridRow: "1", height: 7, heightCss: "56px", justify: "center", left: 29, top: 72, width: 9, widthCss: "92px" },
+  { align: "end", gridColumn: "8", gridRow: "8", height: 8, heightCss: "82px", justify: "center", left: 79, top: 76, width: 5, widthCss: "54px" },
+  { align: "center", gridColumn: "12", gridRow: "8", height: 5, heightCss: "44px", justify: "center", left: 50, top: 6, width: 8, widthCss: "78px" },
+  { align: "center", gridColumn: "1", gridRow: "5", height: 7, heightCss: "62px", justify: "center", left: 91, top: 62, width: 11, widthCss: "112px" },
+  { align: "center", gridColumn: "7", gridRow: "1", height: 10, heightCss: "96px", justify: "center", left: 18, top: 81, width: 6, widthCss: "62px" },
+  { align: "center", gridColumn: "4", gridRow: "8", height: 5, heightCss: "46px", justify: "center", left: 3, top: 38, width: 9, widthCss: "84px" },
 ];
 
 function fixed(value: number, digits = 2) {
@@ -258,19 +261,40 @@ function clip(value: string, limit: number) {
   return `${normalized.slice(0, limit).replace(/\s+\S*$/, "")}`;
 }
 
-function textFragments(value?: string | null, limit = 8) {
+function chunkFragment(value: string, limit: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  const chunks: string[] = [];
+  let remaining = normalized;
+
+  while (remaining.length > limit) {
+    const next = remaining.slice(0, limit).replace(/\s+\S*$/, "").trim();
+    const chunk = next || remaining.slice(0, limit).trim();
+
+    if (!chunk) break;
+
+    chunks.push(chunk);
+    remaining = remaining.slice(chunk.length).trim();
+  }
+
+  if (remaining) chunks.push(remaining);
+
+  return chunks;
+}
+
+function textFragments(value?: string | null, limit = 8, fragmentLength = 96) {
   return (value || "")
     .split(/[\r\n]+|(?<=[.!?])\s+/)
     .map((line) => line.trim())
     .filter((line) => line.length >= 8)
+    .flatMap((line) => chunkFragment(line, fragmentLength))
     .slice(0, limit)
-    .map((line) => clip(line, 96));
+    .map((line) => clip(line, fragmentLength));
 }
 
 function sourceSignals(artifact: FloatExperimentArtifact) {
-  const signals: { reason: string; source: string; text: string }[] = [];
+  const signals: FloatInterferenceSignal[] = [];
 
-  textFragments(artifact.lyrics, 6).forEach((text) =>
+  textFragments(artifact.lyrics, 96).forEach((text) =>
     signals.push({ reason: "lyric memory attached to this artifact", source: artifact.title, text })
   );
   if (artifact.fragment) {
@@ -302,7 +326,7 @@ function sourceSignals(artifact: FloatExperimentArtifact) {
 }
 
 function lyricSignals(artifact: FloatExperimentArtifact) {
-  return textFragments(artifact.lyrics, 8).map((text) => ({
+  return textFragments(artifact.lyrics, Number.POSITIVE_INFINITY).map((text) => ({
     reason: "lyric memory interrupting the center signal",
     source: artifact.title,
     text,
@@ -414,6 +438,77 @@ function richness(artifact: FloatExperimentArtifact) {
   );
 }
 
+function stringSeed(value: string) {
+  return [...value].reduce(
+    (total, char, index) => total + char.charCodeAt(0) * (index + 11),
+    0
+  );
+}
+
+function normalizedImageUrl(artifact: FloatExperimentArtifact) {
+  return (artifact.image_url || "").trim();
+}
+
+function uniqueImageArtifacts(artifacts: FloatExperimentArtifact[]) {
+  const seen = new Set<string>();
+
+  return artifacts.filter((artifact) => {
+    const imageUrl = normalizedImageUrl(artifact);
+
+    if (!imageUrl || seen.has(imageUrl)) return false;
+
+    seen.add(imageUrl);
+    return true;
+  });
+}
+
+function visualClusterKey(artifact: FloatExperimentArtifact) {
+  return (
+    artifact.parent_id ||
+    artifact.parent_slug ||
+    artifact.album_id ||
+    artifact.song_id ||
+    artifact.band_id ||
+    artifact.id
+  );
+}
+
+function diversifiedSceneItems(
+  candidates: {
+    artifact: FloatExperimentArtifact;
+    rel: Relationship;
+    score: number;
+  }[],
+  limit: number
+) {
+  const selected: typeof candidates = [];
+  const selectedIds = new Set<string>();
+  const selectedClusters = new Set<string>();
+
+  candidates.forEach((candidate) => {
+    const cluster = visualClusterKey(candidate.artifact);
+
+    if (
+      selected.length < limit &&
+      !selectedIds.has(candidate.artifact.id) &&
+      !selectedClusters.has(cluster)
+    ) {
+      selected.push(candidate);
+      selectedIds.add(candidate.artifact.id);
+      selectedClusters.add(cluster);
+    }
+  });
+
+  candidates.forEach((candidate) => {
+    if (selected.length < limit && !selectedIds.has(candidate.artifact.id)) {
+      selected.push(candidate);
+      selectedIds.add(candidate.artifact.id);
+    }
+  });
+
+  return selected;
+}
+
 function principlesFor(piece: MemoryPiece) {
   const principles = ["association instead of navigation", "labels as archive residue"];
   if (piece.isAnchor) principles.push("fragments drifting into awareness");
@@ -432,28 +527,37 @@ function buildScene(
   seed: number,
   cycle: number
 ): MemoryPiece[] {
-  const imageArtifacts = artifacts.filter((artifact) => artifact.image_url);
+  const imageArtifacts = uniqueImageArtifacts(artifacts);
 
   if (!imageArtifacts.length) return [];
 
   const anchorPool = [...imageArtifacts].sort((left, right) => {
-    const leftScore = richness(left) + seededRange(seed + left.id.length, 0, 8);
-    const rightScore = richness(right) + seededRange(seed + right.id.length, 0, 8);
+    const leftSeed = stringSeed(`${left.id}:${left.slug}:${left.image_url || ""}`);
+    const rightSeed = stringSeed(`${right.id}:${right.slug}:${right.image_url || ""}`);
+    const leftScore =
+      richness(left) + seededRange(seed + cycle * 191 + leftSeed, 0, 72);
+    const rightScore =
+      richness(right) + seededRange(seed + cycle * 191 + rightSeed, 0, 72);
+
     return rightScore - leftScore;
   });
   const anchor =
-    anchorPool[Math.floor(seededUnit(seed + cycle * 97) * Math.min(anchorPool.length, 18))] ||
+    anchorPool[Math.floor(seededUnit(seed + cycle * 97) * Math.min(anchorPool.length, 48))] ||
     anchorPool[0];
 
-  const related = imageArtifacts
+  const relatedCandidates = imageArtifacts
     .filter((artifact) => artifact.id !== anchor.id)
     .map((artifact, index) => {
       const rel = relationship(anchor, artifact);
-      const accident = seededRange(seed + cycle * 131 + index * 17, 0, 13);
+      const artifactNoise = stringSeed(`${artifact.id}:${artifact.slug}`);
+      const accident = seededRange(seed + cycle * 131 + index * 17 + artifactNoise, 0, 72);
       return { artifact, rel, score: rel.score + accident };
     })
-    .sort((left, right) => right.score - left.score)
-    .slice(0, layoutSlots.length - 1);
+    .sort((left, right) => right.score - left.score);
+  const related = diversifiedSceneItems(
+    relatedCandidates,
+    layoutSlots.length - 1
+  );
 
   const selected = [
     { artifact: anchor, rel: relationship(anchor, anchor) },
@@ -461,11 +565,17 @@ function buildScene(
   ];
 
   for (let index = selected.length; index < layoutSlots.length; index += 1) {
-    const artifact = imageArtifacts[index % imageArtifacts.length];
+    const fallbackPool = imageArtifacts.filter(
+      (artifact) => !selected.some((item) => item.artifact.id === artifact.id)
+    );
+    const artifact =
+      fallbackPool[index % Math.max(1, fallbackPool.length)] ||
+      imageArtifacts[index % imageArtifacts.length];
+
     selected.push({
       artifact,
       rel: {
-        reasons: [`repeated source crop from ${artifact.title}`],
+        reasons: [`wide archive image from ${artifact.title}`],
         score: 1,
       },
     });
@@ -522,7 +632,9 @@ function buildTransmissionText(
   artifacts: FloatExperimentArtifact[],
   seed: number,
   cycle: number,
-  phase: FloatPhase
+  phase: FloatPhase,
+  signalIntensity = 100,
+  sourceInterference: FloatInterferenceSignal[] = []
 ) {
   const prioritized = [
     ...scene.map((piece) => piece.artifact),
@@ -530,7 +642,10 @@ function buildTransmissionText(
       (artifact) => !scene.some((piece) => piece.artifact.id === artifact.id)
     ),
   ];
-  const pool = prioritized.flatMap(sourceSignals);
+  const pool = [
+    ...sourceInterference,
+    ...prioritized.flatMap(sourceSignals),
+  ];
   const fallback = [
     { reason: "fallback corrupted caption", source: "system", text: "THE HOUSE REMEMBERS" },
     { reason: "fallback corrupted caption", source: "system", text: "SIGNAL LOSS / STILL LISTENING" },
@@ -538,7 +653,7 @@ function buildTransmissionText(
     { reason: "fallback corrupted caption", source: "system", text: "DO NOT TRUST THE IMAGE" },
   ];
   const signals = pool.length ? pool : fallback;
-  const count = ELSEWHERE_FLOAT_INTENSITY_V2
+  const baseCount = ELSEWHERE_FLOAT_INTENSITY_V2
     ? phase === "text"
       ? 124
       : phase === "catalog"
@@ -547,6 +662,7 @@ function buildTransmissionText(
           ? 88
           : 72
     : 8;
+  const count = Math.max(8, Math.round(baseCount * (signalIntensity / 100)));
   const classes = [
     "elsewhere-memory-text--micro",
     "elsewhere-memory-text--small",
@@ -681,20 +797,32 @@ function lyricStrength(text: string) {
 function centralSignal(
   artifacts: FloatExperimentArtifact[],
   seed: number,
-  cycle: number
+  cycle: number,
+  fragmentLength = 34,
+  lyricWeight = 100,
+  sourceInterference: FloatInterferenceSignal[] = []
 ) {
-  const pool = artifacts
-    .flatMap(lyricSignals)
+  const lyricPool = artifacts.flatMap(lyricSignals);
+  const fallbackPool = [
+    ...sourceInterference,
+    ...artifacts.flatMap(sourceSignals),
+  ].filter((signal) => signal.text.trim().length >= 3);
+  const rawPool = lyricPool.length > 0 ? lyricPool : fallbackPool;
+  const pool = rawPool
     .map((signal, index) => ({
       ...signal,
       index,
-      score: lyricStrength(signal.text) + seededRange(seed + cycle * 97 + index * 31, 0, 7),
+      score: lyricStrength(signal.text) + seededRange(seed + index * 31, 0, 7),
     }))
     .sort((left, right) => right.score - left.score);
 
   if (pool.length === 0) return null;
 
-  const candidateCount = Math.min(pool.length, 8);
+  const weightedCount = Math.round(pool.length * (lyricWeight / 100));
+  const candidateCount = Math.min(
+    pool.length,
+    Math.max(Math.min(4, pool.length), weightedCount)
+  );
   let signalIndex = Math.floor(seededUnit(seed + cycle * 811 + 811) * candidateCount);
 
   if (cycle > 0 && candidateCount > 1) {
@@ -711,7 +839,7 @@ function centralSignal(
 
   return {
     ...signal,
-    text: clip(signal.text.toUpperCase(), 34),
+    text: clip(signal.text.toUpperCase(), fragmentLength),
   };
 }
 
@@ -771,10 +899,12 @@ function MutatingText({
 }
 
 function TransmissionTextLayer({
+  mutationIntensity = 1,
   reducedMotion,
   signal,
   seed,
 }: {
+  mutationIntensity?: number;
   reducedMotion: boolean;
   signal: TransmissionText;
   seed: number;
@@ -799,7 +929,7 @@ function TransmissionTextLayer({
           reducedMotion={reducedMotion}
           seed={seed}
           text={signal.text}
-          intensity={0.2}
+          intensity={0.2 * mutationIntensity}
         />
       ) : (
         signal.text
@@ -851,6 +981,89 @@ function RegisterFrameLayer({ frames }: { frames: RegisterFrame[] }) {
           />
         );
       })}
+    </div>
+  );
+}
+
+function CentralSignalLayer({
+  central,
+  centralCycle,
+  mutationIntensity,
+  reducedMotion,
+  seed,
+  transmissionText,
+}: {
+  central: NonNullable<ReturnType<typeof centralSignal>>;
+  centralCycle: number;
+  mutationIntensity: number;
+  reducedMotion: boolean;
+  seed: number;
+  transmissionText: TransmissionText[];
+}) {
+  const corruptionSeed = seed + centralCycle * 137;
+  const overlays = transmissionText.slice(0, 5);
+  const lineCount = seededUnit(corruptionSeed + 3) > 0.42 ? 7 : 4;
+  const centerTextSize = Math.max(
+    1.7,
+    Math.min(9.6, 138 / Math.max(central.text.length, 12))
+  );
+  const stackStyle = {
+    "--central-text-size": `${centerTextSize.toFixed(2)}vw`,
+  } as CSSProperties;
+
+  return (
+    <div className="elsewhere-memory-central" aria-hidden>
+      <div className="elsewhere-memory-central__stack" style={stackStyle}>
+        <MutatingText
+          className="elsewhere-memory-central__text elsewhere-memory-central__text--machine elsewhere-memory-central__text--contained"
+          intensity={0.16 * mutationIntensity}
+          reducedMotion={reducedMotion}
+          seed={seed + centralCycle * 701}
+          text={central.text}
+        />
+        <div className="elsewhere-memory-central__corruption">
+          {Array.from({ length: lineCount }, (_, index) => {
+            const lineSeed = corruptionSeed + index * 43;
+            const vertical = seededUnit(lineSeed + 1) > 0.56;
+            const style = {
+              "--central-line-delay": `${seededRange(lineSeed + 2, -9, -0.5).toFixed(2)}s`,
+              "--central-line-left": `${seededRange(lineSeed + 3, 4, 94).toFixed(2)}%`,
+              "--central-line-opacity": seededRange(lineSeed + 4, 0.22, 0.62).toFixed(2),
+              "--central-line-rotate": `${seededRange(lineSeed + 5, -1.8, 1.8).toFixed(2)}deg`,
+              "--central-line-top": `${seededRange(lineSeed + 6, 8, 88).toFixed(2)}%`,
+              "--central-line-width": `${seededRange(lineSeed + 7, 18, 92).toFixed(2)}%`,
+            } as CSSProperties;
+
+            return (
+              <span
+                className={`elsewhere-memory-central__strike ${vertical ? "is-vertical" : "is-horizontal"}`}
+                key={`line-${index}`}
+                style={style}
+              />
+            );
+          })}
+          {overlays.map((signal, index) => {
+            const overlaySeed = corruptionSeed + index * 79;
+            const style = {
+              "--central-overlay-delay": `${seededRange(overlaySeed + 1, -11, -0.5).toFixed(2)}s`,
+              "--central-overlay-left": `${seededRange(overlaySeed + 2, 12, 74).toFixed(2)}%`,
+              "--central-overlay-opacity": seededRange(overlaySeed + 3, 0.24, 0.52).toFixed(2),
+              "--central-overlay-scale": seededRange(overlaySeed + 4, 0.3, 0.5).toFixed(2),
+              "--central-overlay-top": `${seededRange(overlaySeed + 5, 18, 78).toFixed(2)}%`,
+            } as CSSProperties;
+
+            return (
+              <span
+                className="elsewhere-memory-central__interference"
+                key={`${signal.text}-${index}`}
+                style={style}
+              >
+                {clip(signal.text.toUpperCase(), 48)}
+              </span>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -967,11 +1180,21 @@ function AtmosphericTextureLayers() {
 
 export default function FloatExperiment({
   artifacts,
+  controls = FLOAT_CONTROL_DEFAULTS,
   debugMode,
+  returnHref = "/",
+  showControls = true,
+  sourceInterference = [],
+  videoFormat,
   seed,
 }: {
   artifacts: FloatExperimentArtifact[];
+  controls?: FloatControlValues;
   debugMode: boolean;
+  returnHref?: string;
+  showControls?: boolean;
+  sourceInterference?: FloatInterferenceSignal[];
+  videoFormat?: FloatVideoFormat;
   seed: number;
 }) {
   const [imageCycle, setImageCycle] = useState(0);
@@ -990,10 +1213,35 @@ export default function FloatExperiment({
     () => buildScene(artifacts, seed, imageCycle),
     [artifacts, imageCycle, seed]
   );
-  const anchor = scene[0];
+  const visibleScene = useMemo(() => {
+    const count = Math.max(
+      4,
+      Math.min(scene.length, Math.round(scene.length * (controls.iden / 100)))
+    );
+
+    return scene.slice(0, count);
+  }, [controls.iden, scene]);
+  const anchor = visibleScene[0];
   const transmissionText = useMemo(
-    () => buildTransmissionText(scene, artifacts, seed, textCycle, phase),
-    [artifacts, phase, scene, seed, textCycle]
+    () =>
+      buildTransmissionText(
+        visibleScene,
+        artifacts,
+        seed,
+        textCycle,
+        phase,
+        controls.sig,
+        sourceInterference
+      ),
+    [
+      artifacts,
+      controls.sig,
+      phase,
+      seed,
+      sourceInterference,
+      textCycle,
+      visibleScene,
+    ]
   );
   const catalogSignals = useMemo(
     () => buildCatalogSignals(artifacts, seed, textCycle),
@@ -1004,9 +1252,40 @@ export default function FloatExperiment({
     [phase, seed, textureCycle]
   );
   const central = useMemo(
-    () => centralSignal(artifacts, seed, centralCycle),
-    [artifacts, centralCycle, seed]
+    () =>
+      centralSignal(
+        artifacts,
+        seed,
+        centralCycle,
+        controls.frag,
+        controls.lyric,
+        sourceInterference
+      ),
+    [
+      artifacts,
+      centralCycle,
+      controls.frag,
+      controls.lyric,
+      seed,
+      sourceInterference,
+    ]
   );
+  const imageRate = controls.irate / 100;
+  const centerRate = controls.crate / 100;
+  const style = {
+    "--float-caption-opacity": String(controls.capvis / 100),
+    "--float-caption-scale": String(controls.capsize / 100),
+    "--float-center-scale": String(controls.cscale / 100),
+    "--float-color-drift": String(controls.color / 100),
+    "--float-darkness": String(controls.dark / 100),
+    "--float-frame-opacity": String(controls.frames / 100),
+    "--float-image-scale": String(controls.iscale / 100),
+    "--float-layout-spread": String(controls.spread / 100),
+    "--float-motion-smoothness": String(controls.smooth / 100),
+    "--float-texture-strength": String(controls.tex / 100),
+    "--float-vertical-bias": String(controls.vbias / 100),
+    "--float-vividness": `${controls.vivid - 100}%`,
+  } as CSSProperties;
   const associationCountdownMs = associationTargetTime && clockNow
     ? Math.max(0, Math.floor(associationTargetTime - clockNow))
     : 0;
@@ -1021,7 +1300,7 @@ export default function FloatExperiment({
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setClockNow(Date.now()), 33);
+    const timer = window.setInterval(() => setClockNow(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -1087,7 +1366,7 @@ export default function FloatExperiment({
     const schedule = () => {
       const delay = quiet
         ? seededRange(seed + step * 31 + 5, 9_000, 15_000)
-        : seededRange(seed + step * 31 + 5, 5_800, 12_400);
+        : seededRange(seed + step * 31 + 5, 5_800, 12_400) / imageRate;
       setAssociationTargetTime(Date.now() + delay);
 
       timer = window.setTimeout(() => {
@@ -1104,7 +1383,7 @@ export default function FloatExperiment({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [quiet, reducedMotion, seed]);
+  }, [imageRate, quiet, reducedMotion, seed]);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -1142,7 +1421,7 @@ export default function FloatExperiment({
     const schedule = () => {
       const delay = quiet
         ? seededRange(seed + step * 43 + 17, 4_400, 8_800)
-        : seededRange(seed + step * 43 + 17, 1_700, 5_600);
+        : seededRange(seed + step * 43 + 17, 1_700, 5_600) / imageRate;
 
       timer = window.setTimeout(() => {
         if (cancelled) return;
@@ -1158,7 +1437,7 @@ export default function FloatExperiment({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [quiet, reducedMotion, seed]);
+  }, [imageRate, quiet, reducedMotion, seed]);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -1167,7 +1446,9 @@ export default function FloatExperiment({
     let step = 0;
 
     const schedule = () => {
-      const delay = seededRange(seed + step * 59 + 29, 6_000, 15_000);
+      const delay = videoFormat
+        ? seededRange(seed + step * 59 + 29, 2_800, 5_200) / centerRate
+        : seededRange(seed + step * 59 + 29, 6_000, 15_000) / centerRate;
 
       timer = window.setTimeout(() => {
         if (cancelled) return;
@@ -1183,11 +1464,12 @@ export default function FloatExperiment({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [quiet, reducedMotion, seed]);
+  }, [centerRate, quiet, reducedMotion, seed, videoFormat]);
 
   return (
     <main
-      className={`elsewhere-memory-stage min-h-screen overflow-hidden bg-[#070604] text-stone-200 ${ELSEWHERE_FLOAT_INTENSITY_V2 ? "elsewhere-memory-stage--intensity-v2" : ""} elsewhere-memory-stage--phase-${phase} ${rareEvent ? "elsewhere-memory-stage--rare-event" : ""}`}
+      className={`elsewhere-memory-stage min-h-screen overflow-hidden bg-[#070604] text-stone-200 ${ELSEWHERE_FLOAT_INTENSITY_V2 ? "elsewhere-memory-stage--intensity-v2" : ""} elsewhere-memory-stage--phase-${phase} ${rareEvent ? "elsewhere-memory-stage--rare-event" : ""} ${videoFormat ? "elsewhere-memory-stage--video" : ""} ${videoFormat ? `elsewhere-memory-stage--video-${videoFormat}` : ""}`}
+      style={style}
     >
       <div className="elsewhere-memory-ground" aria-hidden />
       <AtmosphericTextureLayers />
@@ -1203,6 +1485,7 @@ export default function FloatExperiment({
             {transmissionText.map((signal, index) => (
               <TransmissionTextLayer
                 key={`${signal.text}-${textCycle}-${index}`}
+                mutationIntensity={controls.mut / 100}
                 reducedMotion={reducedMotion}
                 seed={seed + textCycle * 1009 + index * 61}
                 signal={signal}
@@ -1210,42 +1493,43 @@ export default function FloatExperiment({
             ))}
           </div>
           {central && (
-            <div className="elsewhere-memory-central" aria-hidden>
-              <MutatingText
-                className="elsewhere-memory-central__text elsewhere-memory-central__text--machine elsewhere-memory-central__text--contained"
-                intensity={0.16}
-                reducedMotion={reducedMotion}
-                seed={seed + centralCycle * 701}
-                text={central.text}
-              />
-            </div>
+            <CentralSignalLayer
+              central={central}
+              centralCycle={centralCycle}
+              mutationIntensity={controls.mut / 100}
+              reducedMotion={reducedMotion}
+              seed={seed}
+              transmissionText={transmissionText}
+            />
           )}
         </>
       )}
       <section className="relative z-20 flex min-h-screen flex-col px-5 py-5 md:px-8">
-        <header className="flex items-start justify-between gap-5">
-          {showIntro ? (
-            <div className="elsewhere-memory-intro">
-              <p className="text-[10px] uppercase tracking-[0.48em] text-stone-600">
-                Elsewhere / float experiment
-              </p>
-              <h1 className="mt-3 font-serif text-4xl text-stone-100 md:text-6xl">
-                The archive is thinking.
-              </h1>
-            </div>
-          ) : (
-            <div aria-hidden />
-          )}
-          <Link
-            href="/"
-            className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.34em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
-          >
-            Return
-          </Link>
-        </header>
+        {showControls && (
+          <header className="flex items-start justify-between gap-5">
+            {showIntro && controls.intro > 0 ? (
+              <div className="elsewhere-memory-intro">
+                <p className="text-[10px] uppercase tracking-[0.48em] text-stone-600">
+                  Elsewhere / float experiment
+                </p>
+                <h1 className="mt-3 font-serif text-4xl text-stone-100 md:text-6xl">
+                  The archive is thinking.
+                </h1>
+              </div>
+            ) : (
+              <div aria-hidden />
+            )}
+            <Link
+              href={returnHref}
+              className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.34em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
+            >
+              Return
+            </Link>
+          </header>
+        )}
 
         <div className="elsewhere-memory-table relative mt-6 flex-1">
-          {scene.map((piece, index) => (
+          {visibleScene.map((piece, index) => (
             <MemoryPieceCard
               key={`${piece.artifact.id}-${imageCycle}-${index}`}
               piece={piece}
@@ -1268,32 +1552,34 @@ export default function FloatExperiment({
           )}
         </div>
 
-        <footer className="relative z-40 flex flex-wrap items-end justify-between gap-4 border-t border-stone-900/80 pt-4">
-          <span aria-hidden />
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.3em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
-              onClick={() => setQuiet((current) => !current)}
-            >
-              {quiet ? "Resume Signal" : "Reduce Signal"}
-            </button>
-            <button
-              type="button"
-              className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.3em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
-              onClick={() => {
-                setImageCycle((current) => current + 1);
-                setAssociationTargetTime(Date.now());
-                setTextCycle((current) => current + 1);
-                setCentralCycle((current) => current + 1);
-                setPhaseCycle((current) => current + 1);
-                setTextureCycle((current) => current + 1);
-              }}
-            >
-              Remember Again
-            </button>
-          </div>
-        </footer>
+        {showControls && (
+          <footer className="relative z-40 flex flex-wrap items-end justify-between gap-4 border-t border-stone-900/80 pt-4">
+            <span aria-hidden />
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.3em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
+                onClick={() => setQuiet((current) => !current)}
+              >
+                {quiet ? "Resume Signal" : "Reduce Signal"}
+              </button>
+              <button
+                type="button"
+                className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.3em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
+                onClick={() => {
+                  setImageCycle((current) => current + 1);
+                  setAssociationTargetTime(Date.now());
+                  setTextCycle((current) => current + 1);
+                  setCentralCycle((current) => current + 1);
+                  setPhaseCycle((current) => current + 1);
+                  setTextureCycle((current) => current + 1);
+                }}
+              >
+                Remember Again
+              </button>
+            </div>
+          </footer>
+        )}
       </section>
 
       {debugMode && (

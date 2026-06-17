@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import crypto from "crypto";
 import TitleSlugFields from "@/components/TitleSlugFields";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
+import DriftMoodCheckboxes from "@/components/DriftMoodCheckboxes";
+import { cleanDriftMoods } from "@/lib/drift-moods";
 import { spotifyUrl } from "@/lib/spotify";
 import { artifactVisibility } from "@/lib/artifact-visibility";
 
@@ -194,6 +196,7 @@ async function createArtifact(formData: FormData) {
     motifs: splitList(formData.get("motifs")),
     rooms: splitList(formData.get("rooms")),
     nearby: splitList(formData.get("nearby")),
+    drift_moods: cleanDriftMoods(formData.getAll("drift_moods")),
 
     image_url,
     audio_url,
@@ -477,6 +480,8 @@ export default async function NewArtifactPage({
                 placeholder="lonely, warm, unsettling, nocturnal"
               />
             </div>
+
+            <DriftMoodCheckboxes />
 
             <div>
               <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">

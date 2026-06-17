@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import ArchiveBranch from "@/components/ArchiveBranch";
 import SourceInterference from "@/components/SourceInterference";
 import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/server";
 import {
   artifactType,
+  relatedScore,
   shuffle,
   type ArchiveArtifact,
 } from "@/lib/archive-navigation";
@@ -13,6 +14,12 @@ import {
   ARCHIVE_MAP_COLORS,
   DRIFT_DIRECTION_COLORS,
 } from "@/lib/archive-map-colors";
+import {
+  driftMoodLabel,
+  driftMoodNeighbors,
+  driftMoodPrompt,
+  isDriftMood,
+} from "@/lib/drift-moods";
 import { getYouTubeThumbnailUrl } from "@/lib/video";
 
 type DriftReading = {
@@ -63,6 +70,10 @@ function isImageOnlyArtifact(artifact: ArchiveArtifact) {
 }
 
 function artifactOpenHref(artifact: ArchiveArtifact) {
+  if (artifactType(artifact) === "Poster") {
+    return `/posters?poster=${encodeURIComponent(artifact.slug)}`;
+  }
+
   if (isImageOnlyArtifact(artifact) && artifact.parent_slug) {
     return `/artifact/${artifact.parent_slug}?image=${encodeURIComponent(
       artifact.slug
@@ -70,6 +81,17 @@ function artifactOpenHref(artifact: ArchiveArtifact) {
   }
 
   return `/artifact/${artifact.slug}`;
+}
+
+function driftHref(slug: string, trail: string[], mood = "") {
+  const params = new URLSearchParams();
+  const trailValue = trail.join(",");
+
+  if (trailValue) params.set("trail", trailValue);
+  if (isDriftMood(mood)) params.set("mood", mood);
+
+  const query = params.toString();
+  return `/drift/${slug}${query ? `?${query}` : ""}`;
 }
 
 function driftReadings(
@@ -151,6 +173,10 @@ function driftReadings(
     readings.push({ key: "image", prompt: "Let an image choose the way" });
   }
 
+  if (artifactType(candidate) === "Poster") {
+    readings.push({ key: "poster", prompt: "Follow a live paper signal" });
+  }
+
   if (candidate.video_url?.trim() || candidate.youtube_url?.trim()) {
     readings.push({ key: "video", prompt: "Enter the moving image" });
   }
@@ -180,12 +206,46 @@ function driftReadings(
   return readings;
 }
 
+function chooseReading(
+  current: ArchiveArtifact,
+  candidate: ArchiveArtifact,
+  hidden = false,
+  mood = ""
+) {
+  const readings = driftReadings(current, candidate);
+  const posterReading = readings.find((reading) => reading.key === "poster");
+  const moodReading =
+    isDriftMood(mood) && (candidate.drift_moods || []).includes(mood)
+      ? ({
+          key: `drift-mood:${mood}`,
+          prompt: driftMoodPrompt(mood, candidate.slug.length),
+        } satisfies DriftReading)
+      : null;
+  const nonChanceReadings = readings.filter((reading) => reading.key !== "chance");
+  const reading =
+    posterReading ||
+    moodReading ||
+    shuffle(nonChanceReadings)[0] ||
+    readings.find((item) => item.key === "chance") ||
+    readings[0] ||
+    ({ key: "chance", prompt: "Take an unmarked passage" } satisfies DriftReading);
+
+  return {
+    ...reading,
+    prompt:
+      hidden && reading.key === "chance"
+        ? "Open a misfiled passage"
+        : reading.prompt,
+  };
+}
+
 function chooseDirections(
   current: ArchiveArtifact,
   artifacts: ArchiveArtifact[],
-  trail: string[]
+  trail: string[],
+  activeMood = ""
 ) {
-  const revealHidden = shouldRevealHiddenDirection(current, trail);
+  const revealHidden = shouldRevealHiddenDirection(current, trail, activeMood);
   const publicCandidates = artifacts.filter(
     (artifact) => artifact.id !== current.id && !trail.includes(artifact.slug)
   );
@@ -197,11 +257,18 @@ function chooseDirections(
         (artifact) => artifact.discovery_visibility === "hidden"
       )
     : [];
-  const possibilities = shuffle(
-    candidates.flatMap((artifact) =>
-      driftReadings(current, artifact).map((reading) => ({ artifact, reading }))
-    )
-  );
+  const possibilities = candidates
+    .map((artifact) => ({
+      artifact,
+      mood: chooseDirectionMood(activeMood, artifact),
+      rank: driftCandidateRank(current, artifact, activeMood),
+    }))
+    .sort((left, right) => right.rank - left.rank)
+    .map(({ artifact, mood }) => ({
+      artifact,
+      mood,
+      reading: chooseReading(current, artifact, false, mood),
+    }));
   const chosen: (typeof possibilities)[number][] = [];
   const artifactIds = new Set<string>();
   const readingKeys = new Set<string>();
@@ -226,20 +293,19 @@ function chooseDirections(
   });
 
   if (hiddenCandidates.length > 0 && chosen.length > 0) {
-    const hiddenPossibility = shuffle(
-      hiddenCandidates.flatMap((artifact) =>
-        driftReadings(current, artifact).map((reading) => ({
-          artifact,
-          reading: {
-            ...reading,
-            prompt:
-              reading.key === "chance"
-                ? "Open a misfiled passage"
-                : reading.prompt,
-          },
-        }))
-      )
-    )[0];
+    const hiddenArtifact = shuffle(hiddenCandidates)[0];
+    const hiddenPossibility = hiddenArtifact
+      ? {
+          artifact: hiddenArtifact,
+          mood: chooseDirectionMood(activeMood, hiddenArtifact),
+          reading: chooseReading(
+            current,
+            hiddenArtifact,
+            true,
+            chooseDirectionMood(activeMood, hiddenArtifact)
+          ),
+        }
+      : null;
 
     if (hiddenPossibility) {
       chosen[chosen.length - 1] = hiddenPossibility;
@@ -249,7 +315,11 @@ function chooseDirections(
   return chosen;
 }
 
-function shouldRevealHiddenDirection(current: ArchiveArtifact, trail: string[]) {
+function shouldRevealHiddenDirection(
+  current: ArchiveArtifact,
+  trail: string[],
+  activeMood = ""
+) {
   if (current.discovery_visibility === "hidden") return true;
 
   const seed = [...current.slug, ...trail.join("")].reduce(
@@ -257,7 +327,64 @@ function shouldRevealHiddenDirection(current: ArchiveArtifact, trail: string[]) 
     0
   );
 
+  if (activeMood === "late-night") return seed % 3 === 0;
+  if (activeMood === "dusk" || activeMood === "evening") return seed % 4 === 0;
+
   return seed % 5 === 0;
+}
+
+function chooseDirectionMood(activeMood: string, candidate: ArchiveArtifact) {
+  const candidateMoods = candidate.drift_moods || [];
+  const neighbors = driftMoodNeighbors(activeMood);
+
+  return (
+    candidateMoods.find((mood) => mood === activeMood) ||
+    candidateMoods.find((mood) => neighbors.includes(mood)) ||
+    candidateMoods[0] ||
+    activeMood
+  );
+}
+
+function driftMoodScore(candidate: ArchiveArtifact, activeMood: string) {
+  const candidateMoods = candidate.drift_moods || [];
+
+  if (!activeMood || candidateMoods.length === 0) return 0;
+  if (candidateMoods.includes(activeMood)) return 14;
+
+  const neighbors = driftMoodNeighbors(activeMood);
+  if (candidateMoods.some((mood) => neighbors.includes(mood))) return 8;
+
+  return 0;
+}
+
+function driftCandidateRank(
+  current: ArchiveArtifact,
+  candidate: ArchiveArtifact,
+  activeMood = ""
+) {
+  const type = artifactType(candidate);
+  const mediaScore =
+    (candidate.image_url ? 3 : 0) +
+    (candidate.audio_url ? 3 : 0) +
+    (candidate.video_url || candidate.youtube_url ? 3 : 0) +
+    (candidate.fragment ? 2 : 0);
+  const typeScore =
+    type === "Poster"
+      ? 4
+      : type === "Song"
+        ? 3
+        : type === "Album" || type === "Single"
+          ? 2
+          : 0;
+
+  return (
+    relatedScore(current, candidate) * 2 +
+    mediaScore +
+    typeScore +
+    driftMoodScore(candidate, activeMood) +
+    (candidate.drift_weight || 0) +
+    Math.random() * 8
+  );
 }
 
 function signalPreview(artifact: ArchiveArtifact): SignalPreview | null {
@@ -336,17 +463,23 @@ export default async function DriftArtifactPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ trail?: string | string[] }>;
+  searchParams: Promise<{
+    mood?: string | string[];
+    trail?: string | string[];
+  }>;
 }) {
   const { slug } = await params;
-  const rawTrail = (await searchParams).trail;
+  const query = await searchParams;
+  const rawTrail = query.trail;
+  const rawMood = query.mood;
   const trailValue = Array.isArray(rawTrail) ? rawTrail[0] : rawTrail || "";
+  const moodValue = Array.isArray(rawMood) ? rawMood[0] : rawMood || "";
   const trail = trailValue.split(",").filter(Boolean).slice(-7);
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("artifacts")
     .select(
-      "id, slug, title, kind, artifact_type, parent_id, parent_slug, band_id, album_id, song_id, year, atmosphere, motifs, image_url, audio_url, video_url, youtube_url, spotify_url, lyrics, fragment, description, drift_weight, discovery_visibility"
+      "id, slug, title, kind, artifact_type, parent_id, parent_slug, band_id, album_id, song_id, year, atmosphere, motifs, drift_moods, image_url, audio_url, video_url, youtube_url, spotify_url, fragment, description, drift_weight, discovery_visibility"
     )
     .eq("is_public", true)
     .in("discovery_visibility", ["public", "hidden"]);
@@ -364,7 +497,18 @@ export default async function DriftArtifactPage({
 
   if (!current) notFound();
 
-  const candidates = chooseDirections(current, artifacts, trail);
+  const currentIsSong = artifactType(current) === "Song";
+  const { data: currentLyricsData } = currentIsSong
+    ? await supabase
+        .from("artifacts")
+        .select("lyrics")
+        .eq("id", current.id)
+        .maybeSingle()
+    : { data: null };
+
+  const activeMood =
+    isDriftMood(moodValue) ? moodValue : (current.drift_moods || [])[0] || "";
+  const candidates = chooseDirections(current, artifacts, trail, activeMood);
   const nextTrail = [...trail, current.slug].slice(-7);
   const trailArtifacts = nextTrail
     .map((trailSlug) => artifacts.find((artifact) => artifact.slug === trailSlug))
@@ -391,8 +535,9 @@ export default async function DriftArtifactPage({
   );
   const currentPreview = representativePreview(current, previewPool);
   const directionPreviews = candidates
-    .map(({ artifact, reading }, index) => ({
+    .map(({ artifact, mood, reading }, index) => ({
       artifact,
+      mood,
       reading,
       color: DRIFT_DIRECTION_COLORS[index],
       number: index + 1,
@@ -408,12 +553,13 @@ export default async function DriftArtifactPage({
   const audioPreviews = shuffle([current, ...attachedArtifacts])
     .filter((artifact) => artifact.audio_url?.trim())
     .slice(0, 2);
-  const currentIsSong = artifactType(current) === "Song";
-  const currentLyricFragments = currentIsSong ? lyricFragments(current.lyrics) : [];
+  const currentLyricFragments = currentIsSong
+    ? lyricFragments((currentLyricsData?.lyrics as string | null) || "")
+    : [];
   const backdrop = uniqueBackdrop(residueArtifacts, ordinaryArtifacts);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#090807] px-6 py-8 text-stone-200">
+    <main className="relative min-h-screen overflow-hidden bg-[#090807] px-4 py-5 text-stone-200 sm:px-6 sm:py-8">
       <div className="absolute inset-0 opacity-55">
         <div className="grid h-full grid-cols-4 grid-rows-3 gap-1 p-1 md:grid-cols-6">
           {backdrop.map(({ imageUrl, residue }) => (
@@ -438,8 +584,8 @@ export default async function DriftArtifactPage({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(9,8,7,0.22),rgba(9,8,7,0.91)_72%)]" />
       <div className="absolute inset-0 bg-black/25" />
 
-      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl flex-col">
-        <header className="flex items-center justify-between gap-5">
+      <div className="relative mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-6xl flex-col sm:min-h-[calc(100vh-4rem)]">
+        <header className="flex flex-wrap items-center justify-between gap-4 sm:gap-5">
           <Link
             href="/"
             className="text-[10px] uppercase tracking-[0.34em] text-stone-400 transition hover:text-white"
@@ -454,12 +600,12 @@ export default async function DriftArtifactPage({
           </Link>
         </header>
 
-        <div className="grid flex-1 items-center gap-12 py-12 lg:grid-cols-[minmax(0,1fr)_28rem]">
+        <div className="grid flex-1 items-center gap-9 py-10 sm:gap-12 sm:py-12 lg:grid-cols-[minmax(0,1fr)_28rem]">
           <section>
             <p className="text-[10px] uppercase tracking-[0.44em] text-stone-400">
-              Drift / {current.discovery_visibility === "hidden" ? "misfiled" : artifactType(current) || "signal"}
+              Drift / {activeMood ? driftMoodLabel(activeMood) : current.discovery_visibility === "hidden" ? "misfiled" : artifactType(current) || "signal"}
             </p>
-            <h1 className="mt-5 max-w-4xl font-serif text-6xl leading-none text-stone-100 md:text-8xl">
+            <h1 className="mt-5 max-w-4xl font-serif text-5xl leading-none text-stone-100 sm:text-6xl md:text-8xl">
               {current.title}
             </h1>
             {currentIsSong && (
@@ -525,7 +671,7 @@ export default async function DriftArtifactPage({
                 atmosphere: current.atmosphere || [],
                 motifs: current.motifs || [],
               }}
-              limit={3}
+              limit={6}
             />
             {(currentPreview || directionPreviews.length > 0 || audioPreviews.length > 0) && (
               <div className="mt-9 max-w-2xl border-t border-stone-700/80 pt-5">
@@ -566,11 +712,11 @@ export default async function DriftArtifactPage({
                       </Link>
                     )}
                     {directionPreviews.length > 0 && (
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        {directionPreviews.map(({ artifact, color, number, preview }) => (
+                      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {directionPreviews.map(({ artifact, color, mood, number, preview }) => (
                           <Link
                             key={artifact.id}
-                            href={`/drift/${artifact.slug}?trail=${encodeURIComponent(nextTrail.join(","))}`}
+                            href={driftHref(artifact.slug, nextTrail, mood)}
                             className="group relative aspect-[4/3] overflow-hidden border bg-black/70"
                             style={{
                               borderColor: color,
@@ -629,7 +775,7 @@ export default async function DriftArtifactPage({
             )}
           </section>
 
-          <aside>
+          <aside className="lg:pt-4">
             <p className="text-center text-[10px] uppercase tracking-[0.34em] text-stone-300">
               Choose a direction
             </p>
@@ -648,10 +794,10 @@ export default async function DriftArtifactPage({
               style={{ backgroundColor: ARCHIVE_MAP_COLORS.root }}
             />
             <div
-              className="space-y-1 border-l pl-12"
+              className="space-y-1 border-l pl-8 sm:pl-12"
               style={{ borderColor: ARCHIVE_MAP_COLORS.root }}
             >
-              {candidates.map(({ artifact, reading }, index) => (
+              {candidates.map(({ artifact, mood, reading }, index) => (
                 <div key={artifact.id} className="relative">
                   <ArchiveBranch
                     className="-left-12 top-0 h-14 w-12"
@@ -662,7 +808,7 @@ export default async function DriftArtifactPage({
                     }
                   />
                   <Link
-                    href={`/drift/${artifact.slug}?trail=${encodeURIComponent(nextTrail.join(","))}`}
+                    href={driftHref(artifact.slug, nextTrail, mood)}
                     className="group block px-2 py-3 transition"
                   >
                     <p className="text-[9px] uppercase tracking-[0.2em] text-stone-400 transition group-hover:text-white">
@@ -671,6 +817,11 @@ export default async function DriftArtifactPage({
                     <p className="mt-1 font-serif text-lg text-stone-200 transition group-hover:text-white">
                       {artifact.title}
                     </p>
+                    {mood && (
+                      <p className="mt-1 text-[8px] uppercase tracking-[0.18em] text-stone-600 transition group-hover:text-stone-400">
+                        {driftMoodLabel(mood)}
+                      </p>
+                    )}
                   </Link>
                 </div>
               ))}

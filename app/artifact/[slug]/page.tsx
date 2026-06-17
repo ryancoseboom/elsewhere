@@ -22,6 +22,7 @@ import ArtifactImageExperience, {
 import FloatExperiment, {
   type FloatExperimentArtifact,
 } from "@/components/FloatExperiment";
+import { readFloatControls } from "@/lib/float-controls";
 import ArtifactSectionOrder from "@/components/ArtifactSectionOrder";
 import {
   ArtifactEphemeraBrowser,
@@ -33,6 +34,10 @@ import SourceInterference from "@/components/SourceInterference";
 import { archiveTexture, archiveTextureSet } from "@/lib/archive-textures";
 
 const ELSEWHERE_ATMOSPHERE_V2 = true;
+const ARTIFACT_PAGE_SELECT =
+  "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, spotify_url, lyrics, discovery_visibility, album, year, era, sort_order";
+const ARTIFACT_INDEX_SELECT =
+  "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, spotify_url, lyrics, discovery_visibility, album, year, era, sort_order";
 
 type Artifact = {
   id: string;
@@ -1467,7 +1472,7 @@ function VisualScrapbook({
                 atmosphere: artifact.atmosphere || [],
                 motifs: artifact.motifs || [],
               }}
-              limit={2}
+              limit={5}
             />
 
             {visualSlotCount > 0 && (isAlbumPage || isSingleRelease) && (
@@ -1551,10 +1556,11 @@ export default async function ArtifactPage({
     floatDebug?: string | string[];
     image?: string | string[];
     view?: string | string[];
-  }>;
+  } & Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
   const resolvedSearchParams = await searchParams;
+  const floatControls = readFloatControls(resolvedSearchParams);
   const requestedView = resolvedSearchParams.view;
   const requestedImage = resolvedSearchParams.image;
   const requestedFloat = resolvedSearchParams.float;
@@ -1589,9 +1595,7 @@ export default async function ArtifactPage({
 
   let artifactQuery = supabase
     .from("artifacts")
-    .select(
-      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, discovery_visibility, album, year, era, sort_order"
-    )
+    .select(ARTIFACT_PAGE_SELECT)
     .eq("slug", slug);
   if (!canEdit) {
     artifactQuery = artifactQuery
@@ -1604,27 +1608,11 @@ export default async function ArtifactPage({
     notFound();
   }
 
-  let spotifyQuery = supabase
-    .from("artifacts")
-    .select("id, spotify_url");
-  if (!canEdit) spotifyQuery = spotifyQuery.eq("is_public", true);
-  const { data: spotifyData } = await spotifyQuery;
-  const spotifyUrls = new Map(
-    (spotifyData || []).map((item) => [
-      item.id as string,
-      item.spotify_url as string | null,
-    ])
-  );
-  const currentArtifact = {
-    ...artifact,
-    spotify_url: spotifyUrls.get(artifact.id) || null,
-  } as Artifact;
+  const currentArtifact = artifact as Artifact;
 
   let allArtifactsQuery = supabase
     .from("artifacts")
-    .select(
-      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, discovery_visibility, album, year, era, sort_order"
-    )
+    .select(ARTIFACT_INDEX_SELECT)
     .neq("slug", currentArtifact.slug);
   if (!canEdit) {
     allArtifactsQuery = allArtifactsQuery
@@ -1635,9 +1623,7 @@ export default async function ArtifactPage({
 
   let hiddenArtifactsQuery = supabase
     .from("artifacts")
-    .select(
-      "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, lyrics, discovery_visibility, album, year, era, sort_order"
-    )
+    .select(ARTIFACT_INDEX_SELECT)
     .eq("is_public", true)
     .eq("discovery_visibility", "hidden")
     .neq("slug", currentArtifact.slug)
@@ -1645,14 +1631,8 @@ export default async function ArtifactPage({
   if (canEdit) hiddenArtifactsQuery = hiddenArtifactsQuery.limit(0);
   const { data: hiddenArtifactsData } = await hiddenArtifactsQuery;
 
-  const allArtifacts = (allArtifactsData || []).map((item) => ({
-    ...item,
-    spotify_url: spotifyUrls.get(item.id) || null,
-  })) as Artifact[];
-  const hiddenArtifacts = (hiddenArtifactsData || []).map((item) => ({
-    ...item,
-    spotify_url: spotifyUrls.get(item.id) || null,
-  })) as Artifact[];
+  const allArtifacts = (allArtifactsData || []) as Artifact[];
+  const hiddenArtifacts = (hiddenArtifactsData || []) as Artifact[];
 
   const artifactMap = new Map<string, Artifact>();
   allArtifacts.forEach((item) => artifactMap.set(item.id, item));
@@ -1934,6 +1914,8 @@ export default async function ArtifactPage({
       <FloatExperiment
         artifacts={floatArtifacts}
         debugMode={artifactFloatDebugMode}
+        controls={floatControls}
+        returnHref={`/artifact/${currentArtifact.slug}`}
         seed={experimentSeed}
       />
     );

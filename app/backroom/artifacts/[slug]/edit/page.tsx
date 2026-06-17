@@ -6,7 +6,9 @@ import {
 } from "@/lib/supabase/server";
 import crypto from "crypto";
 import ArtifactMediaFields from "@/components/ArtifactMediaFields";
+import DriftMoodCheckboxes from "@/components/DriftMoodCheckboxes";
 import { syncArtifactDescendantPublication } from "@/lib/artifact-publication";
+import { cleanDriftMoods } from "@/lib/drift-moods";
 import { spotifyUrl } from "@/lib/spotify";
 import { artifactVisibility } from "@/lib/artifact-visibility";
 
@@ -35,6 +37,7 @@ type Artifact = {
   spotify_url: string | null;
   private_notes: string | null;
   discovery_visibility: string | null;
+  drift_moods: string[] | null;
   lyrics: string | null;
   album: string | null;
   year: string | null;
@@ -90,12 +93,19 @@ function cleanId(value: FormDataEntryValue | null) {
   return stringValue.length > 0 ? stringValue : null;
 }
 
-function getSelectedArtifactSlug(
-  artifacts: ArtifactOption[],
-  id: string | null
-) {
+async function getSelectedArtifactSlug(id: string | null) {
   if (!id) return "";
-  return artifacts.find((artifact) => artifact.id === id)?.slug || "";
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("artifacts")
+    .select("slug")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+
+  return (data?.slug as string | undefined) || "";
 }
 
 function getFileExtension(fileName: string) {
@@ -157,12 +167,6 @@ async function updateArtifact(formData: FormData) {
   const song_id = cleanId(formData.get("song_id"));
   const sort_order = Number(formData.get("sort_order") || 0);
 
-  const { data: existingArtifacts } = await supabase
-    .from("artifacts")
-    .select("id, slug, title, artifact_type, kind");
-
-  const artifacts = (existingArtifacts || []) as ArtifactOption[];
-
   const existingImageUrl = String(formData.get("existing_image_url") || "");
   const existingAudioUrl = String(formData.get("existing_audio_url") || "");
   const existingVideoUrl = String(formData.get("existing_video_url") || "");
@@ -212,7 +216,7 @@ async function updateArtifact(formData: FormData) {
 
       parent_slug:
         String(formData.get("parent_slug") || "").trim() ||
-        getSelectedArtifactSlug(artifacts, parent_id),
+        (await getSelectedArtifactSlug(parent_id)),
 
       description: String(formData.get("description") || "").trim(),
       fragment: String(formData.get("fragment") || "").trim(),
@@ -220,6 +224,7 @@ async function updateArtifact(formData: FormData) {
       motifs: splitList(formData.get("motifs")),
       rooms: splitList(formData.get("rooms")),
       nearby: splitList(formData.get("nearby")),
+      drift_moods: cleanDriftMoods(formData.getAll("drift_moods")),
 
       image_url,
       audio_url,
@@ -262,7 +267,7 @@ async function updateArtifact(formData: FormData) {
     isPublic,
   });
 
-  redirect("/backroom");
+  redirect(`/backroom?saved=${encodeURIComponent(title)}`);
 }
 
 async function deleteArtifact(formData: FormData) {
@@ -349,7 +354,7 @@ export default async function EditArtifactPage({
   const { data: artifact, error } = await supabase
     .from("artifacts")
     .select(
-      "id, slug, title, parent_slug, kind, artifact_type, parent_id, band_id, album_id, song_id, sort_order, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, private_notes, discovery_visibility, lyrics, album, year, era, is_public"
+      "id, slug, title, parent_slug, kind, artifact_type, parent_id, band_id, album_id, song_id, sort_order, description, fragment, atmosphere, motifs, rooms, nearby, drift_moods, image_url, audio_url, video_url, youtube_url, private_notes, discovery_visibility, lyrics, album, year, era, is_public"
     )
     .eq("slug", slug)
     .single();
@@ -547,7 +552,7 @@ export default async function EditArtifactPage({
 
             <div>
               <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">
-                Legacy Belongs To Slug
+                Belongs To Slug
               </label>
               <input
                 name="parent_slug"
@@ -556,7 +561,8 @@ export default async function EditArtifactPage({
                 placeholder="coco"
               />
               <p className="mt-2 text-xs text-stone-600">
-                Optional fallback. The new Parent Artifact dropdown is preferred.
+                Optional slug fallback when a parent artifact has not been
+                selected above.
               </p>
             </div>
           </section>
@@ -573,8 +579,8 @@ export default async function EditArtifactPage({
                 placeholder="Coco"
               />
               <p className="mt-2 text-xs text-stone-600">
-                Legacy display field. We’ll eventually replace this with the
-                Album dropdown above.
+                Display label for imported songs and older entries. Use the
+                Album dropdown above when this song belongs to a saved album.
               </p>
             </div>
 
@@ -653,6 +659,8 @@ export default async function EditArtifactPage({
                 className="w-full border-b border-stone-700 bg-transparent px-1 py-3 text-stone-100 outline-none focus:border-stone-300"
               />
             </div>
+
+            <DriftMoodCheckboxes defaultValue={item.drift_moods} />
 
             <div>
               <label className="mb-2 block text-xs uppercase tracking-[0.25em] text-stone-500">

@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/server";
 import { shuffle, type ArchiveArtifact } from "@/lib/archive-navigation";
 
 export default async function DriftPage() {
   await connection();
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("artifacts")
-    .select("id, slug, drift_weight, discovery_visibility")
+    .select("id, slug, drift_moods, drift_weight, discovery_visibility")
     .eq("is_public", true)
     .in("discovery_visibility", ["public", "hidden"])
     .not("slug", "is", null);
@@ -39,5 +39,10 @@ export default async function DriftPage() {
 
   if (shuffled.length === 0) redirect("/");
 
-  redirect(`/drift/${shuffled[0].slug}`);
+  const opening = shuffled[0];
+  const openingMood = opening.drift_moods?.[0];
+
+  redirect(
+    `/drift/${opening.slug}${openingMood ? `?mood=${encodeURIComponent(openingMood)}` : ""}`
+  );
 }

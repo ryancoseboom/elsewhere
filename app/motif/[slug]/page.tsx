@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import SourceInterference from "@/components/SourceInterference";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/server";
 
 type Artifact = {
   id: string;
@@ -29,7 +29,7 @@ export default async function MotifPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = await createClient();
+  const supabase = createPublicClient();
 
   const { data, error } = await supabase
     .from("artifacts")
@@ -81,7 +81,7 @@ export default async function MotifPage({
           <SourceInterference
             className="mt-7"
             context={{ motif: title }}
-            limit={2}
+            limit={5}
           />
         </header>
 

@@ -13,6 +13,11 @@ import {
 } from "react";
 import { ARCHIVE_TEXTURES, archiveTextureSet } from "@/lib/archive-textures";
 import { spotifyUrl as normalizeSpotifyUrl } from "@/lib/spotify";
+import FloatLookControls from "@/components/FloatLookControls";
+import {
+  FLOAT_CONTROL_DEFAULTS,
+  writeFloatControlsToParams,
+} from "@/lib/float-controls";
 
 type ExperienceImage = {
   src: string;
@@ -81,6 +86,38 @@ const openImageEvent = "elsewhere:open-image";
 const closeImageEvent = "elsewhere:close-image";
 const floatTextures = ARCHIVE_TEXTURES;
 const floatTextureCount = 7;
+const bodyScrollLocks = new Set<symbol>();
+let bodyOverflowBeforeLock = "";
+
+function lockBodyScroll() {
+  const lock = Symbol("artifact-image-overlay");
+
+  if (bodyScrollLocks.size === 0) {
+    bodyOverflowBeforeLock = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+  }
+
+  bodyScrollLocks.add(lock);
+
+  return () => {
+    bodyScrollLocks.delete(lock);
+
+    if (bodyScrollLocks.size === 0) {
+      document.body.style.overflow = bodyOverflowBeforeLock;
+      bodyOverflowBeforeLock = "";
+    }
+  };
+}
+
+function clearImageParamFromUrl() {
+  const url = new URL(window.location.href);
+
+  if (!url.searchParams.has("image")) return;
+
+  url.searchParams.delete("image");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 const floatSleeveSlots = [
   {
     align: "left",
@@ -1156,14 +1193,16 @@ export default function ArtifactImageExperience({
     floatVariant === "sleeve" &&
     ["1", "true", "debug", "float"].includes(floatDebugParam || "");
   const routeKey = `${pathname}?${searchParamString}`;
+  const [floatControls, setFloatControls] = useState(FLOAT_CONTROL_DEFAULTS);
   const intensityFloatHref = useMemo(() => {
     const params = new URLSearchParams(searchParamString);
 
     params.set("float", "1");
     params.delete("image");
+    writeFloatControlsToParams(params, floatControls);
 
     return `${pathname}?${params.toString()}`;
-  }, [pathname, searchParamString]);
+  }, [floatControls, pathname, searchParamString]);
   const [lightboxState, setLightboxState] = useState<LightboxState | null>(
     () => {
       const initialImage = initialImageSlug
@@ -1220,6 +1259,8 @@ export default function ArtifactImageExperience({
 
   const closeLightbox = useCallback(() => {
     setLightboxState(null);
+    window.dispatchEvent(new Event(closeImageEvent));
+    clearImageParamFromUrl();
     window.setTimeout(() => previousActiveElementRef.current?.focus(), 0);
   }, []);
 
@@ -1302,12 +1343,7 @@ export default function ArtifactImageExperience({
   useEffect(() => {
     if (!floating && !lightboxImage) return;
 
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
+    return lockBodyScroll();
   }, [floating, lightboxImage]);
 
   useEffect(() => {
@@ -1500,24 +1536,39 @@ export default function ArtifactImageExperience({
   return (
     <>
       {showTrigger && (images.length > 0 || streamUrl) && (
-        <div className="flex flex-wrap gap-3">
+        <div className="grid gap-4">
+          <div className="flex flex-wrap gap-3">
+            {images.length > 0 && (
+              <a
+                href={intensityFloatHref}
+                className="border border-stone-700 px-4 py-2 text-[10px] uppercase tracking-[0.4em] text-stone-400 transition hover:border-stone-400 hover:bg-stone-900 hover:text-stone-100"
+              >
+                Float
+              </a>
+            )}
+            {streamUrl && (
+              <a
+                href={streamUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="border border-[#315d39] px-4 py-2 text-[10px] uppercase tracking-[0.28em] text-[#82b98b] transition hover:border-[#78b183] hover:bg-[#132218] hover:text-[#b9e1bf]"
+              >
+                Stream on Spotify
+              </a>
+            )}
+          </div>
           {images.length > 0 && (
-            <a
-              href={intensityFloatHref}
-              className="border border-stone-700 px-4 py-2 text-[10px] uppercase tracking-[0.4em] text-stone-400 transition hover:border-stone-400 hover:bg-stone-900 hover:text-stone-100"
-            >
-              Float
-            </a>
-          )}
-          {streamUrl && (
-            <a
-              href={streamUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="border border-[#315d39] px-4 py-2 text-[10px] uppercase tracking-[0.28em] text-[#82b98b] transition hover:border-[#78b183] hover:bg-[#132218] hover:text-[#b9e1bf]"
-            >
-              Stream on Spotify
-            </a>
+            <details className="max-w-xl border border-stone-900 bg-black/20 p-4">
+              <summary className="cursor-pointer text-[10px] uppercase tracking-[0.28em] text-stone-600 transition hover:text-stone-300">
+                Float look
+              </summary>
+              <div className="mt-4">
+                <FloatLookControls
+                  controls={floatControls}
+                  onChange={setFloatControls}
+                />
+              </div>
+            </details>
           )}
         </div>
       )}
