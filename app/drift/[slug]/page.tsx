@@ -6,7 +6,6 @@ import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
 import { createPublicClient } from "@/lib/supabase/server";
 import {
   artifactType,
-  relatedScore,
   shuffle,
   type ArchiveArtifact,
 } from "@/lib/archive-navigation";
@@ -257,40 +256,18 @@ function chooseDirections(
         (artifact) => artifact.discovery_visibility === "hidden"
       )
     : [];
-  const possibilities = candidates
+  const possibilities = moodWeightedShuffle(candidates, activeMood)
+    .slice(0, 3)
     .map((artifact) => ({
       artifact,
       mood: chooseDirectionMood(activeMood, artifact),
-      rank: driftCandidateRank(current, artifact, activeMood),
     }))
-    .sort((left, right) => right.rank - left.rank)
     .map(({ artifact, mood }) => ({
       artifact,
       mood,
       reading: chooseReading(current, artifact, false, mood),
     }));
-  const chosen: (typeof possibilities)[number][] = [];
-  const artifactIds = new Set<string>();
-  const readingKeys = new Set<string>();
-
-  possibilities.forEach((possibility) => {
-    if (
-      chosen.length < 3 &&
-      !artifactIds.has(possibility.artifact.id) &&
-      !readingKeys.has(possibility.reading.key)
-    ) {
-      chosen.push(possibility);
-      artifactIds.add(possibility.artifact.id);
-      readingKeys.add(possibility.reading.key);
-    }
-  });
-
-  possibilities.forEach((possibility) => {
-    if (chosen.length < 3 && !artifactIds.has(possibility.artifact.id)) {
-      chosen.push(possibility);
-      artifactIds.add(possibility.artifact.id);
-    }
-  });
+  const chosen = possibilities;
 
   if (hiddenCandidates.length > 0 && chosen.length > 0) {
     const hiddenArtifact = shuffle(hiddenCandidates)[0];
@@ -345,46 +322,29 @@ function chooseDirectionMood(activeMood: string, candidate: ArchiveArtifact) {
   );
 }
 
-function driftMoodScore(candidate: ArchiveArtifact, activeMood: string) {
+function driftMoodInfluence(candidate: ArchiveArtifact, activeMood: string) {
   const candidateMoods = candidate.drift_moods || [];
 
-  if (!activeMood || candidateMoods.length === 0) return 0;
-  if (candidateMoods.includes(activeMood)) return 14;
+  if (!activeMood || candidateMoods.length === 0) return 1;
+  if (candidateMoods.includes(activeMood)) return 1.35;
 
   const neighbors = driftMoodNeighbors(activeMood);
-  if (candidateMoods.some((mood) => neighbors.includes(mood))) return 8;
+  if (candidateMoods.some((mood) => neighbors.includes(mood))) return 1.18;
 
-  return 0;
+  return 1.04;
 }
 
-function driftCandidateRank(
-  current: ArchiveArtifact,
-  candidate: ArchiveArtifact,
-  activeMood = ""
+function moodWeightedShuffle(
+  candidates: ArchiveArtifact[],
+  activeMood: string
 ) {
-  const type = artifactType(candidate);
-  const mediaScore =
-    (candidate.image_url ? 3 : 0) +
-    (candidate.audio_url ? 3 : 0) +
-    (candidate.video_url || candidate.youtube_url ? 3 : 0) +
-    (candidate.fragment ? 2 : 0);
-  const typeScore =
-    type === "Poster"
-      ? 4
-      : type === "Song"
-        ? 3
-        : type === "Album" || type === "Single"
-          ? 2
-          : 0;
-
-  return (
-    relatedScore(current, candidate) * 2 +
-    mediaScore +
-    typeScore +
-    driftMoodScore(candidate, activeMood) +
-    (candidate.drift_weight || 0) +
-    Math.random() * 8
-  );
+  return shuffle(candidates)
+    .map((artifact) => ({
+      artifact,
+      score: Math.random() * driftMoodInfluence(artifact, activeMood),
+    }))
+    .sort((left, right) => right.score - left.score)
+    .map(({ artifact }) => artifact);
 }
 
 function signalPreview(artifact: ArchiveArtifact): SignalPreview | null {
