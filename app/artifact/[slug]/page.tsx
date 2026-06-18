@@ -1475,7 +1475,7 @@ function VisualScrapbook({
               limit={5}
             />
 
-            {visualSlotCount > 0 && (isAlbumPage || isSingleRelease) && (
+            {visualSlotCount > 0 && (isAlbumPage || isSingleRelease || isSongPage) && (
               <section
                 id="ephemera"
                 className={`mt-9 scroll-mt-24 ${
@@ -1504,7 +1504,7 @@ function VisualScrapbook({
               </section>
             )}
 
-            {visualSlotCount > 0 && !isAlbumPage && !isSingleRelease && (
+            {visualSlotCount > 0 && !isAlbumPage && !isSingleRelease && !isSongPage && (
               <div className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: visualSlotCount }, (_, index) => (
                   <VisualCard

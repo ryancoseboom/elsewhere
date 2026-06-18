@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { spotifyUrl } from "@/lib/spotify";
 
 type Artifact = {
   id: string;
@@ -275,6 +278,54 @@ function EditLinks({ artifact }: { artifact: Artifact }) {
       </Link>
     </div>
   );
+}
+
+async function saveBackroomSpotifyLink(formData: FormData) {
+  "use server";
+
+  const id = String(formData.get("id") || "").trim();
+  const title = String(formData.get("title") || "song").trim();
+  const url = spotifyUrl(String(formData.get("spotify_url") || ""));
+
+  if (!id) throw new Error("Missing song id.");
+  if (!url) throw new Error("Paste a valid open.spotify.com link.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("artifacts")
+    .update({ spotify_url: url })
+    .eq("id", id)
+    .or("artifact_type.eq.Song,kind.eq.Song");
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/backroom");
+  revalidatePath("/artifact/[slug]", "page");
+  redirect(`/backroom?saved=${encodeURIComponent(`${title} Spotify`)}`);
+}
+
+async function saveBackroomLyrics(formData: FormData) {
+  "use server";
+
+  const id = String(formData.get("id") || "").trim();
+  const title = String(formData.get("title") || "song").trim();
+  const lyrics = String(formData.get("lyrics") || "").trim();
+
+  if (!id) throw new Error("Missing song id.");
+  if (!lyrics) throw new Error("Paste lyrics before saving.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("artifacts")
+    .update({ lyrics })
+    .eq("id", id)
+    .or("artifact_type.eq.Song,kind.eq.Song");
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/backroom");
+  revalidatePath("/artifact/[slug]", "page");
+  redirect(`/backroom?saved=${encodeURIComponent(`${title} lyrics`)}`);
 }
 
 export default async function BackroomPage({
@@ -599,27 +650,89 @@ export default async function BackroomPage({
                   {visibleSongsMissingEssentials.map((song) => (
                     <div
                       key={song.id}
-                      className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                      className="grid gap-4 py-5"
                     >
-                      <div>
-                        <p className="text-sm text-stone-200">{song.title}</p>
-                        <p className="mt-1 text-xs text-stone-700">
-                          {song.album || song.parent_slug || "No album label"}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {!artifactIdsWithLyrics.has(song.id) && (
-                            <span className="border border-amber-950 bg-amber-950/20 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-amber-500">
-                              Lyrics missing
-                            </span>
-                          )}
-                          {!filled(song.spotify_url) && (
-                            <span className="border border-sky-950 bg-sky-950/20 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-sky-500">
-                              Spotify missing
-                            </span>
-                          )}
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-sm text-stone-200">{song.title}</p>
+                          <p className="mt-1 text-xs text-stone-700">
+                            {song.album || song.parent_slug || "No album label"}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {!artifactIdsWithLyrics.has(song.id) && (
+                              <span className="border border-amber-950 bg-amber-950/20 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-amber-500">
+                                Lyrics missing
+                              </span>
+                            )}
+                            {!filled(song.spotify_url) && (
+                              <span className="border border-sky-950 bg-sky-950/20 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-sky-500">
+                                Spotify missing
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        <EditLinks artifact={song} />
                       </div>
-                      <EditLinks artifact={song} />
+
+                      {!filled(song.spotify_url) && (
+                        <form
+                          action={saveBackroomSpotifyLink}
+                          className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+                        >
+                          <input type="hidden" name="id" value={song.id} />
+                          <input
+                            type="hidden"
+                            name="title"
+                            value={song.title}
+                          />
+                          <label className="sr-only" htmlFor={`spotify-${song.id}`}>
+                            Spotify link for {song.title}
+                          </label>
+                          <input
+                            id={`spotify-${song.id}`}
+                            name="spotify_url"
+                            type="url"
+                            placeholder="Paste Spotify link"
+                            className="min-h-11 border border-sky-950/70 bg-neutral-950 px-3 text-sm text-stone-200 outline-none transition placeholder:text-stone-700 focus:border-sky-700"
+                          />
+                          <button
+                            type="submit"
+                            className="min-h-11 border border-sky-900 px-4 text-[10px] uppercase tracking-[0.2em] text-sky-300 transition hover:border-sky-400 hover:text-sky-100"
+                          >
+                            Save Spotify
+                          </button>
+                        </form>
+                      )}
+
+                      {!artifactIdsWithLyrics.has(song.id) && (
+                        <form
+                          action={saveBackroomLyrics}
+                          className="grid gap-2"
+                        >
+                          <input type="hidden" name="id" value={song.id} />
+                          <input
+                            type="hidden"
+                            name="title"
+                            value={song.title}
+                          />
+                          <label className="sr-only" htmlFor={`lyrics-${song.id}`}>
+                            Lyrics for {song.title}
+                          </label>
+                          <textarea
+                            id={`lyrics-${song.id}`}
+                            name="lyrics"
+                            rows={5}
+                            placeholder="Paste lyrics"
+                            className="w-full border border-amber-950/70 bg-neutral-950 px-3 py-3 text-sm leading-6 text-stone-200 outline-none transition placeholder:text-stone-700 focus:border-amber-700"
+                          />
+                          <button
+                            type="submit"
+                            className="w-fit border border-amber-900 px-4 py-3 text-[10px] uppercase tracking-[0.2em] text-amber-300 transition hover:border-amber-400 hover:text-amber-100"
+                          >
+                            Save lyrics
+                          </button>
+                        </form>
+                      )}
                     </div>
                   ))}
                   {songsMissingEssentials.length > QUEUE_LIMIT && (
