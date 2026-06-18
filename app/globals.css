@@ -2040,6 +2040,7 @@ button:hover > .elsewhere-archive-texture {
 .elsewhere-memory-central__text {
   display: block;
   max-width: min(78vw, 68rem);
+  margin-inline: auto;
   color: rgb(245 245 244) !important;
   font-family:
     "OCR A Std",
@@ -2069,6 +2070,7 @@ button:hover > .elsewhere-archive-texture {
   top: 50%;
   display: grid;
   place-items: center;
+  justify-content: center;
   width: min(96vw, 78rem);
   text-align: center;
   transform: translate3d(-50%, -50%, 0) scale(var(--float-center-scale, 1));
@@ -2077,8 +2079,10 @@ button:hover > .elsewhere-archive-texture {
 .elsewhere-memory-central__stack > .elsewhere-memory-central__text {
   grid-area: 1 / 1;
   justify-self: center;
-  width: 100%;
+  width: fit-content;
+  min-width: 0;
   margin-inline: auto;
+  padding-inline: 0.04em;
 }
 
 .elsewhere-memory-central__corruption {
