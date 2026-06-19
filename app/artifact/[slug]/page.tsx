@@ -947,21 +947,6 @@ function RelatedGrid({
   );
 }
 
-function DirectAdditionsPanel({ artifactId }: { artifactId: string }) {
-  return (
-    <section className="border border-amber-900/60 bg-black/30 p-3">
-      <p className="mb-3 text-[10px] uppercase tracking-[0.25em] text-amber-400">
-        Add directly
-      </p>
-      <div className="grid gap-3">
-        <ArchiveImageDrop artifactId={artifactId} />
-        <ArchiveAudioDrop artifactId={artifactId} />
-        <ArchiveVideoDrop artifactId={artifactId} />
-      </div>
-    </section>
-  );
-}
-
 function artifactDossierCode(artifact: Artifact) {
   const titleSeed = artifact.title
     .toUpperCase()
@@ -1268,7 +1253,7 @@ function VisualScrapbook({
     ...(isAlbumPage && albumTrackPreviews.length > 0
       ? [{ href: "#tracks", label: "Tracks" }]
       : []),
-    ...(isSongPage || isSingleRelease || videos.length > 0
+    ...(canEdit || isSongPage || isSingleRelease || videos.length > 0
       ? [{ href: "#listen-watch", label: "Listen / Watch" }]
       : []),
     ...(ephemeraPanes.length > 0
@@ -1366,7 +1351,7 @@ function VisualScrapbook({
                 url={primarySpotifyUrl}
               />
             )}
-            {videos.length > 0 && (
+            {videos.length > 0 && !canEdit && (
               <VideoGallery
                 items={videos}
                 placeholder="Moving-image fragments will appear here when attached."
@@ -1446,9 +1431,6 @@ function VisualScrapbook({
             )}
 
             <div className="mt-12 space-y-8">
-              {canEdit && (isAlbumPage || isSingleRelease || isSongPage) && (
-                <DirectAdditionsPanel artifactId={artifact.id} />
-              )}
               {(canEdit || isSongPage || isSingleRelease) && (
                 <AudioGallery
                   items={[
@@ -1466,7 +1448,7 @@ function VisualScrapbook({
                   placeholder="Alternate recordings will appear here when attached."
                 />
               )}
-              <div className={isSongPage ? "hidden lg:block" : ""}>
+              <div className={isSongPage && !canEdit ? "hidden lg:block" : ""}>
                 <VideoGallery
                   items={videos}
                   placeholder="Moving-image fragments will appear here when attached."
