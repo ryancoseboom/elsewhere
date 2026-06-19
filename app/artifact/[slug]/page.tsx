@@ -947,6 +947,21 @@ function RelatedGrid({
   );
 }
 
+function DirectAdditionsPanel({ artifactId }: { artifactId: string }) {
+  return (
+    <section className="border border-amber-900/60 bg-black/30 p-3">
+      <p className="mb-3 text-[10px] uppercase tracking-[0.25em] text-amber-400">
+        Add directly
+      </p>
+      <div className="grid gap-3">
+        <ArchiveImageDrop artifactId={artifactId} />
+        <ArchiveAudioDrop artifactId={artifactId} />
+        <ArchiveVideoDrop artifactId={artifactId} />
+      </div>
+    </section>
+  );
+}
+
 function artifactDossierCode(artifact: Artifact) {
   const titleSeed = artifact.title
     .toUpperCase()
@@ -1431,6 +1446,9 @@ function VisualScrapbook({
             )}
 
             <div className="mt-12 space-y-8">
+              {canEdit && (isAlbumPage || isSingleRelease || isSongPage) && (
+                <DirectAdditionsPanel artifactId={artifact.id} />
+              )}
               {(canEdit || isSongPage || isSingleRelease) && (
                 <AudioGallery
                   items={[
