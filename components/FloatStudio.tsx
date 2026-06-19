@@ -127,6 +127,10 @@ export default function FloatStudio({
             <h1 className="mt-3 font-serif text-3xl leading-none text-stone-100">
               Float videos
             </h1>
+            <p className="mt-3 text-xs leading-5 text-stone-500">
+              Build a drifting visual transmission from the Elsewhere archive,
+              tune the look, then render a downloadable video.
+            </p>
           </div>
 
           <div className="mt-5 flex min-h-0 flex-1 flex-col gap-4">
