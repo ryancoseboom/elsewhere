@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import FloatLookControls from "@/components/FloatLookControls";
 import {
@@ -121,9 +122,13 @@ export default function FloatStudio({
       <div className="grid gap-5 lg:h-full lg:grid-cols-[25rem_minmax(0,1fr)]">
         <aside className="flex min-h-0 flex-col border border-stone-800 bg-black/30 p-4">
           <div className="shrink-0">
-            <p className="text-[10px] uppercase tracking-[0.42em] text-stone-600">
-              Elsewhere / Float Studio
-            </p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] uppercase tracking-[0.34em] text-stone-600">
+              <Link className="transition hover:text-stone-300" href="/">
+                Elsewhere
+              </Link>
+              <span>/</span>
+              <span>Float Studio</span>
+            </div>
             <h1 className="mt-3 font-serif text-3xl leading-none text-stone-100">
               Float videos
             </h1>
