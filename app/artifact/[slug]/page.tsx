@@ -1669,7 +1669,7 @@ export default async function ArtifactPage({
     relatedArtifactConditions.push(`band_id.eq.${currentArtifact.id}`);
   }
 
-  if (["Album", "Single"].includes(currentArtifactType)) {
+  if (["Album", "EP", "Single"].includes(currentArtifactType)) {
     relatedArtifactConditions.push(`album_id.eq.${currentArtifact.id}`);
   }
 
@@ -1775,6 +1775,15 @@ export default async function ArtifactPage({
   const isAlbumPage = currentArtifactType === "Album";
   const isSingleRelease = currentArtifactType === "Single";
   const presentationChildArtifacts = childArtifacts;
+  const releaseSongArtifacts = ["Album", "EP", "Single"].includes(
+    currentArtifactType
+  )
+    ? allArtifacts.filter(
+        (candidate) =>
+          getArtifactType(candidate) === "Song" &&
+          candidate.album_id === currentArtifact.id
+      )
+    : [];
 
   const albums = childArtifacts.filter(
     (child) => ["Album", "Single"].includes(getArtifactType(child))
@@ -1974,6 +1983,7 @@ export default async function ArtifactPage({
 
   if (artifactFloatMode) {
     const floatArtifactMap = new Map<string, FloatExperimentArtifact>();
+    const centralTextArtifactMap = new Map<string, FloatExperimentArtifact>();
 
     [
       artifactFloatExperimentArtifact(currentArtifact),
@@ -1981,8 +1991,16 @@ export default async function ArtifactPage({
     ].forEach((item) => {
       floatArtifactMap.set(item.id, item);
     });
+    [
+      artifactFloatExperimentArtifact(currentArtifact),
+      ...childArtifacts.map((item) => artifactFloatExperimentArtifact(item)),
+      ...releaseSongArtifacts.map((item) => artifactFloatExperimentArtifact(item)),
+    ].forEach((item) => {
+      centralTextArtifactMap.set(item.id, item);
+    });
 
     const floatArtifacts = [...floatArtifactMap.values()];
+    const centralTextArtifacts = [...centralTextArtifactMap.values()];
     const experimentSeed = [...currentArtifact.slug].reduce(
       (total, char, index) => total + char.charCodeAt(0) * (index + 17),
       1701
@@ -1991,6 +2009,7 @@ export default async function ArtifactPage({
     return (
       <FloatExperiment
         artifacts={floatArtifacts}
+        centralTextArtifacts={centralTextArtifacts}
         debugMode={artifactFloatDebugMode}
         controls={floatControls}
         returnHref={`/artifact/${currentArtifact.slug}`}

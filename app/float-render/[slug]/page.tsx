@@ -76,6 +76,10 @@ function videoFormat(value: string | undefined): FloatVideoFormat {
   return value === "instagram" || value === "vertical" ? "instagram" : "youtube";
 }
 
+function artifactType(artifact: Artifact) {
+  return artifact.artifact_type || artifact.kind || "";
+}
+
 export default async function FloatRenderPage({
   params,
   searchParams,
@@ -162,14 +166,21 @@ export default async function FloatRenderPage({
   if (error || !current) notFound();
 
   const artifact = current as Artifact;
+  const childConditions = [
+    `parent_id.eq.${artifact.id}`,
+    `parent_slug.eq.${artifact.slug}`,
+  ];
+
+  if (["Album", "EP", "Single"].includes(artifactType(artifact))) {
+    childConditions.push(`album_id.eq.${artifact.id}`);
+  }
+
   const { data: childData } = await supabase
     .from("artifacts")
     .select(fields)
     .eq("is_public", true)
     .eq("discovery_visibility", "public")
-    .or(
-      `parent_id.eq.${artifact.id},parent_slug.eq.${artifact.slug}`
-    )
+    .or(childConditions.join(","))
     .limit(80);
   const children = ((childData || []) as Artifact[]).filter(
     (item) => item.id !== artifact.id
