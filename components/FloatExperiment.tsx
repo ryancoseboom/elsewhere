@@ -336,7 +336,10 @@ function lyricSignals(artifact: FloatExperimentArtifact) {
 function isSongLyricSource(artifact: FloatExperimentArtifact) {
   const type = artifact.artifact_type || artifact.kind || "";
 
-  return type.toLowerCase() === "song" && Boolean(artifact.lyrics?.trim());
+  return (
+    ["single", "song"].includes(type.toLowerCase()) &&
+    Boolean(artifact.lyrics?.trim())
+  );
 }
 
 function titleWords(artifact: FloatExperimentArtifact) {
