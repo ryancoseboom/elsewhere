@@ -2039,7 +2039,7 @@ button:hover > .elsewhere-archive-texture {
 
 .elsewhere-memory-central__text {
   display: block;
-  max-width: min(78vw, 68rem);
+  max-width: min(92vw, 68rem);
   margin-inline: auto;
   color: rgb(245 245 244) !important;
   font-family:
@@ -2071,7 +2071,7 @@ button:hover > .elsewhere-archive-texture {
   display: grid;
   place-items: center;
   justify-content: center;
-  width: min(96vw, 78rem);
+  width: min(92vw, 78rem);
   text-align: center;
   transform: translate3d(-50%, -50%, 0) scale(var(--float-center-scale, 1));
 }
@@ -2160,7 +2160,7 @@ button:hover > .elsewhere-archive-texture {
 }
 
 .elsewhere-memory-central__text--contained {
-  max-width: min(78vw, 68rem) !important;
+  max-width: min(92vw, 68rem) !important;
   overflow-wrap: anywhere !important;
   text-align: center !important;
   white-space: normal !important;
@@ -2168,16 +2168,17 @@ button:hover > .elsewhere-archive-texture {
 
 @media (orientation: landscape) {
   .elsewhere-memory-stage .elsewhere-memory-central__text {
-    max-width: 96vw !important;
-    overflow-wrap: normal !important;
-    text-wrap: nowrap !important;
-    white-space: nowrap !important;
+    max-width: 92vw !important;
+    overflow-wrap: anywhere !important;
+    text-wrap: balance !important;
+    white-space: normal !important;
   }
 
   .elsewhere-memory-stage .elsewhere-memory-central__text--contained {
-    max-width: 96vw !important;
-    overflow-wrap: normal !important;
-    white-space: nowrap !important;
+    max-width: 92vw !important;
+    overflow-wrap: anywhere !important;
+    text-wrap: balance !important;
+    white-space: normal !important;
   }
 }
 

@@ -1,7 +1,6 @@
 import { spawn } from "child_process";
 import { mkdir } from "fs/promises";
 import path from "path";
-import { NextRequest } from "next/server";
 import {
   FLOAT_CONTROL_DEFINITIONS,
   FLOAT_CONTROL_DEFAULTS,
@@ -19,21 +18,6 @@ type FloatRenderBody = {
   format?: string;
   slug?: string;
 };
-
-function hasValidBackroomAuthorization(value: string | null) {
-  if (!value?.startsWith("Basic ")) return false;
-
-  try {
-    const [user, password] = atob(value.slice(6)).split(":");
-
-    return (
-      user === process.env.BACKROOM_USER &&
-      password === process.env.BACKROOM_PASSWORD
-    );
-  } catch {
-    return false;
-  }
-}
 
 function slugForFile(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -93,17 +77,7 @@ function runFloatExport(args: string[]) {
   });
 }
 
-export async function POST(request: NextRequest) {
-  const hasBackroomCookie =
-    request.cookies.get("elsewhere_backroom")?.value === "yes";
-  const hasAuthorization = hasValidBackroomAuthorization(
-    request.headers.get("authorization")
-  );
-
-  if (!hasBackroomCookie && !hasAuthorization) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as FloatRenderBody;
   const slug = String(body.slug || "").trim();
   const format = body.format === "instagram" ? "instagram" : "youtube";
