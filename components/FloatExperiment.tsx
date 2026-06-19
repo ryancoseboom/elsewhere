@@ -662,7 +662,7 @@ function buildTransmissionText(
           ? 88
           : 72
     : 8;
-  const count = Math.max(8, Math.round(baseCount * (signalIntensity / 100)));
+  const count = Math.max(0, Math.round(baseCount * (signalIntensity / 100)));
   const classes = [
     "elsewhere-memory-text--micro",
     "elsewhere-memory-text--small",
@@ -991,6 +991,7 @@ function CentralSignalLayer({
   mutationIntensity,
   reducedMotion,
   seed,
+  showInterference,
   transmissionText,
 }: {
   central: NonNullable<ReturnType<typeof centralSignal>>;
@@ -998,11 +999,16 @@ function CentralSignalLayer({
   mutationIntensity: number;
   reducedMotion: boolean;
   seed: number;
+  showInterference: boolean;
   transmissionText: TransmissionText[];
 }) {
   const corruptionSeed = seed + centralCycle * 137;
-  const overlays = transmissionText.slice(0, 5);
-  const lineCount = seededUnit(corruptionSeed + 3) > 0.42 ? 7 : 4;
+  const overlays = showInterference ? transmissionText.slice(0, 5) : [];
+  const lineCount = showInterference
+    ? seededUnit(corruptionSeed + 3) > 0.42
+      ? 7
+      : 4
+    : 0;
   const centerTextSize = Math.max(
     1.7,
     Math.min(9.6, 138 / Math.max(central.text.length, 12))
@@ -1214,9 +1220,9 @@ export default function FloatExperiment({
     [artifacts, imageCycle, seed]
   );
   const visibleScene = useMemo(() => {
-    const count = Math.max(
-      4,
-      Math.min(scene.length, Math.round(scene.length * (controls.iden / 100)))
+    const count = Math.min(
+      scene.length,
+      Math.round(scene.length * (controls.iden / 100))
     );
 
     return scene.slice(0, count);
@@ -1272,6 +1278,8 @@ export default function FloatExperiment({
   );
   const imageRate = controls.irate / 100;
   const centerRate = controls.crate / 100;
+  const showCenter = controls.cscale > 0;
+  const showSignal = controls.sig > 0;
   const style = {
     "--float-caption-opacity": String(controls.capvis / 100),
     "--float-caption-scale": String(controls.capsize / 100),
@@ -1475,30 +1483,35 @@ export default function FloatExperiment({
       <AtmosphericTextureLayers />
       {ELSEWHERE_FLOAT_INTENSITY_V2 && (
         <>
-          <div className="elsewhere-memory-broadcast" aria-hidden />
-          <CatalogSignalStrip
-            reducedMotion={reducedMotion}
-            signals={catalogSignals}
-          />
-          <RegisterFrameLayer frames={registerFrames} />
-          <div className="elsewhere-memory-text-field" aria-hidden>
-            {transmissionText.map((signal, index) => (
-              <TransmissionTextLayer
-                key={`${signal.text}-${textCycle}-${index}`}
-                mutationIntensity={controls.mut / 100}
+          {showSignal && (
+            <>
+              <div className="elsewhere-memory-broadcast" aria-hidden />
+              <CatalogSignalStrip
                 reducedMotion={reducedMotion}
-                seed={seed + textCycle * 1009 + index * 61}
-                signal={signal}
+                signals={catalogSignals}
               />
-            ))}
-          </div>
-          {central && (
+              <div className="elsewhere-memory-text-field" aria-hidden>
+                {transmissionText.map((signal, index) => (
+                  <TransmissionTextLayer
+                    key={`${signal.text}-${textCycle}-${index}`}
+                    mutationIntensity={controls.mut / 100}
+                    reducedMotion={reducedMotion}
+                    seed={seed + textCycle * 1009 + index * 61}
+                    signal={signal}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {controls.frames > 0 && <RegisterFrameLayer frames={registerFrames} />}
+          {central && showCenter && (
             <CentralSignalLayer
               central={central}
               centralCycle={centralCycle}
               mutationIntensity={controls.mut / 100}
               reducedMotion={reducedMotion}
               seed={seed}
+              showInterference={showSignal}
               transmissionText={transmissionText}
             />
           )}

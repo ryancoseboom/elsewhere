@@ -1,9 +1,9 @@
 export const FLOAT_CONTROL_DEFINITIONS = [
-  { id: "sig", label: "Signal intensity", min: 40, max: 180, step: 5, defaultValue: 100 },
+  { id: "sig", label: "Signal intensity", min: 0, max: 180, step: 5, defaultValue: 100 },
   { id: "mut", label: "Text mutation", min: 0, max: 180, step: 5, defaultValue: 100 },
-  { id: "cscale", label: "Center text scale", min: 55, max: 145, step: 5, defaultValue: 100 },
+  { id: "cscale", label: "Center text scale", min: 0, max: 145, step: 5, defaultValue: 100 },
   { id: "crate", label: "Center text change rate", min: 40, max: 220, step: 5, defaultValue: 100 },
-  { id: "iden", label: "Image density", min: 35, max: 140, step: 5, defaultValue: 100 },
+  { id: "iden", label: "Image density", min: 0, max: 140, step: 5, defaultValue: 100 },
   { id: "irate", label: "Image change rate", min: 40, max: 220, step: 5, defaultValue: 100 },
   { id: "iscale", label: "Image scale", min: 70, max: 135, step: 5, defaultValue: 100 },
   { id: "vivid", label: "Image color", min: 40, max: 160, step: 5, defaultValue: 100 },
@@ -23,6 +23,29 @@ export const FLOAT_CONTROL_DEFINITIONS = [
 
 export type FloatControlId = (typeof FLOAT_CONTROL_DEFINITIONS)[number]["id"];
 export type FloatControlValues = Record<FloatControlId, number>;
+
+export const FLOAT_CONTROL_GROUPS = [
+  {
+    title: "Signal",
+    controls: ["sig", "mut", "tex", "frames"] satisfies FloatControlId[],
+  },
+  {
+    title: "Center Text",
+    controls: ["cscale", "crate", "lyric", "frag"] satisfies FloatControlId[],
+  },
+  {
+    title: "Images",
+    controls: ["iden", "irate", "iscale", "vivid"] satisfies FloatControlId[],
+  },
+  {
+    title: "Caption",
+    controls: ["capvis", "capsize"] satisfies FloatControlId[],
+  },
+  {
+    title: "Scene",
+    controls: ["spread", "vbias", "smooth", "color", "dark", "intro"] satisfies FloatControlId[],
+  },
+] as const;
 
 export const FLOAT_CONTROL_DEFAULTS = FLOAT_CONTROL_DEFINITIONS.reduce(
   (controls, definition) => ({

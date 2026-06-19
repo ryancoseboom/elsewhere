@@ -1566,6 +1566,7 @@ export default function ArtifactImageExperience({
                 <FloatLookControls
                   controls={floatControls}
                   onChange={setFloatControls}
+                  variant="tabs"
                 />
               </div>
             </details>

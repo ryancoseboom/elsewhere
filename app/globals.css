@@ -2054,7 +2054,7 @@ button:hover > .elsewhere-archive-texture {
   font-weight: 700;
   line-height: 0.82 !important;
   letter-spacing: 0.08em;
-  text-align: center;
+  text-align: center !important;
   text-transform: uppercase;
   text-wrap: balance;
   overflow-wrap: anywhere;
@@ -2078,11 +2078,12 @@ button:hover > .elsewhere-archive-texture {
 
 .elsewhere-memory-central__stack > .elsewhere-memory-central__text {
   grid-area: 1 / 1;
-  justify-self: center;
-  width: fit-content;
+  justify-self: stretch;
+  width: 100%;
   min-width: 0;
   margin-inline: auto;
   padding-inline: 0.04em;
+  text-align: center !important;
 }
 
 .elsewhere-memory-central__corruption {
@@ -2161,6 +2162,7 @@ button:hover > .elsewhere-archive-texture {
 .elsewhere-memory-central__text--contained {
   max-width: min(78vw, 68rem) !important;
   overflow-wrap: anywhere !important;
+  text-align: center !important;
   white-space: normal !important;
 }
 
@@ -2249,7 +2251,7 @@ button:hover > .elsewhere-archive-texture {
 }
 
 .elsewhere-memory-stage--video-youtube .elsewhere-memory-caption h2 {
-  font-size: clamp(1.6rem, 3.2vw, 3.6rem);
+  font-size: calc(clamp(1.6rem, 3.2vw, 3.6rem) * var(--float-caption-scale, 1));
 }
 
 .elsewhere-memory-stage--video-instagram > section {
@@ -2353,7 +2355,7 @@ button:hover > .elsewhere-archive-texture {
 
 .elsewhere-memory-stage--video-instagram .elsewhere-memory-caption h2 {
   max-width: 72vw;
-  font-size: clamp(2.7rem, 10vw, 6rem);
+  font-size: calc(clamp(2.7rem, 10vw, 6rem) * var(--float-caption-scale, 1));
 }
 
 .elsewhere-memory-ground {
@@ -2880,7 +2882,7 @@ button:hover > .elsewhere-archive-texture {
 
 .elsewhere-memory-caption p {
   font-family: var(--font-geist-mono), monospace;
-  font-size: 9px;
+  font-size: calc(9px * var(--float-caption-scale, 1));
   letter-spacing: 0.34em;
   text-transform: uppercase;
   color: rgba(120, 113, 108, 0.9);
@@ -2891,7 +2893,7 @@ button:hover > .elsewhere-archive-texture {
   top: -2.2rem;
   left: 0;
   color: rgb(245 245 244) !important;
-  font-size: clamp(1.15rem, 2.5vw, 2.3rem) !important;
+  font-size: calc(clamp(1.15rem, 2.5vw, 2.3rem) * var(--float-caption-scale, 1)) !important;
   letter-spacing: 0.14em !important;
   line-height: 1 !important;
 }
@@ -2909,7 +2911,7 @@ button:hover > .elsewhere-archive-texture {
   top: -2.2rem !important;
   left: 0 !important;
   color: rgb(245 245 244) !important;
-  font-size: clamp(1.15rem, 2.5vw, 2.3rem) !important;
+  font-size: calc(clamp(1.15rem, 2.5vw, 2.3rem) * var(--float-caption-scale, 1)) !important;
   letter-spacing: 0.14em !important;
   line-height: 1 !important;
 }
@@ -2926,7 +2928,7 @@ button:hover > .elsewhere-archive-texture {
   margin-top: 0.75rem;
   display: block;
   max-width: 34rem;
-  font-size: 0.82rem;
+  font-size: calc(0.82rem * var(--float-caption-scale, 1));
   line-height: 1.7;
   color: rgba(168, 162, 158, 0.72);
 }
@@ -3250,7 +3252,7 @@ button:hover > .elsewhere-archive-texture {
 
   .elsewhere-memory-caption h2 {
     max-width: 74vw;
-    font-size: clamp(2.1rem, 11vw, 4.8rem);
+    font-size: calc(clamp(2.1rem, 11vw, 4.8rem) * var(--float-caption-scale, 1));
   }
 
   .elsewhere-float-sleeve-grid {

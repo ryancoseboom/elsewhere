@@ -39,6 +39,8 @@ type FloatRenderSearchParams = Promise<{
   format?: string | string[];
 } & Record<string, string | string[] | undefined>>;
 
+const GLOBAL_FLOAT_SLUG = "__global";
+
 function toFloatArtifact(artifact: Artifact): FloatExperimentArtifact {
   return {
     album: artifact.album,
@@ -91,6 +93,62 @@ export default async function FloatRenderPage({
   const supabase = await createClient();
   const fields =
     "id, slug, title, kind, artifact_type, parent_id, parent_slug, band_id, album_id, song_id, description, fragment, lyrics, atmosphere, motifs, rooms, nearby, image_url, album, year, era, discovery_visibility";
+
+  if (slug === GLOBAL_FLOAT_SLUG) {
+    const { data, error } = await supabase
+      .from("artifacts")
+      .select(fields)
+      .eq("is_public", true)
+      .in("discovery_visibility", ["public", "hidden"])
+      .limit(500);
+
+    if (error) throw new Error(error.message);
+
+    const rawFloatArtifacts = ((data || []) as Artifact[])
+      .filter((artifact) => artifact.image_url?.trim())
+      .map(toFloatArtifact);
+    const publicFloatArtifacts = rawFloatArtifacts.filter(
+      (artifact) => artifact.discovery_visibility !== "hidden"
+    );
+    const floatContext = {
+      atmosphere: [
+        ...new Set(publicFloatArtifacts.flatMap((artifact) => artifact.atmosphere || [])),
+      ].slice(0, 10),
+      motifs: [
+        ...new Set(publicFloatArtifacts.flatMap((artifact) => artifact.motifs || [])),
+      ].slice(0, 10),
+    };
+    const sourceInterferenceSnippets = await getSourceInterferenceSnippets({
+      context: floatContext,
+      limit: 14,
+      supabase,
+    });
+    const sourceInterference: FloatInterferenceSignal[] = [
+      ...sourceInterferenceSnippets,
+      ...getLaunchInterferenceSnippets(floatContext, 10),
+    ].map((snippet) => ({
+      reason: snippet.tone,
+      source: snippet.sourceTitle,
+      text: snippet.text,
+    }));
+    const seed = [...GLOBAL_FLOAT_SLUG, format].reduce(
+      (total, char, index) => total + char.charCodeAt(0) * (index + 17),
+      format === "instagram" ? 9701 : 8701
+    );
+
+    return (
+      <FloatExperiment
+        artifacts={publicFloatArtifacts}
+        debugMode={debugMode}
+        seed={seed}
+        showControls={false}
+        controls={controls}
+        sourceInterference={sourceInterference}
+        videoFormat={format}
+      />
+    );
+  }
+
   const { data: current, error } = await supabase
     .from("artifacts")
     .select(fields)
