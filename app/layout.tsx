@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { siteUrl } from "@/lib/site";
+import BackroomSessionKeepAlive from "@/components/BackroomSessionKeepAlive";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -63,7 +64,12 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
-        {isAdmin && <AdminSessionReminder />}
+        {isAdmin && (
+          <>
+            <BackroomSessionKeepAlive />
+            <AdminSessionReminder />
+          </>
+        )}
       </body>
     </html>
   );

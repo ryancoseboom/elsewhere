@@ -51,7 +51,9 @@ export async function enterBackroomAction(formData: FormData) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 8,
+    maxAge: 60 * 60 * 24 * 30,
+    priority: "high",
+    secure: process.env.NODE_ENV === "production",
   });
 
   const separator = nextPath.includes("?") ? "&" : "?";
