@@ -333,6 +333,12 @@ function lyricSignals(artifact: FloatExperimentArtifact) {
   }));
 }
 
+function isSongLyricSource(artifact: FloatExperimentArtifact) {
+  const type = artifact.artifact_type || artifact.kind || "";
+
+  return type.toLowerCase() === "song" && Boolean(artifact.lyrics?.trim());
+}
+
 function titleWords(artifact: FloatExperimentArtifact) {
   return artifact.title
     .toLowerCase()
@@ -799,16 +805,12 @@ function centralSignal(
   seed: number,
   cycle: number,
   fragmentLength = 34,
-  lyricWeight = 100,
-  sourceInterference: FloatInterferenceSignal[] = []
+  lyricWeight = 100
 ) {
-  const lyricPool = artifacts.flatMap(lyricSignals);
-  const fallbackPool = [
-    ...sourceInterference,
-    ...artifacts.flatMap(sourceSignals),
-  ].filter((signal) => signal.text.trim().length >= 3);
-  const rawPool = lyricPool.length > 0 ? lyricPool : fallbackPool;
-  const pool = rawPool
+  const pool = artifacts
+    .filter(isSongLyricSource)
+    .flatMap(lyricSignals)
+    .filter((signal) => signal.text.trim().length >= 3)
     .map((signal, index) => ({
       ...signal,
       index,
@@ -1186,6 +1188,7 @@ function AtmosphericTextureLayers() {
 
 export default function FloatExperiment({
   artifacts,
+  centralTextArtifacts,
   controls = FLOAT_CONTROL_DEFAULTS,
   debugMode,
   returnHref = "/",
@@ -1195,6 +1198,7 @@ export default function FloatExperiment({
   seed,
 }: {
   artifacts: FloatExperimentArtifact[];
+  centralTextArtifacts?: FloatExperimentArtifact[];
   controls?: FloatControlValues;
   debugMode: boolean;
   returnHref?: string;
@@ -1260,20 +1264,19 @@ export default function FloatExperiment({
   const central = useMemo(
     () =>
       centralSignal(
-        artifacts,
+        centralTextArtifacts || artifacts,
         seed,
         centralCycle,
         controls.frag,
-        controls.lyric,
-        sourceInterference
+        controls.lyric
       ),
     [
       artifacts,
+      centralTextArtifacts,
       centralCycle,
       controls.frag,
       controls.lyric,
       seed,
-      sourceInterference,
     ]
   );
   const imageRate = controls.irate / 100;

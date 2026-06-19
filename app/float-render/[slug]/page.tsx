@@ -104,18 +104,19 @@ export default async function FloatRenderPage({
 
     if (error) throw new Error(error.message);
 
-    const rawFloatArtifacts = ((data || []) as Artifact[])
-      .filter((artifact) => artifact.image_url?.trim())
-      .map(toFloatArtifact);
-    const publicFloatArtifacts = rawFloatArtifacts.filter(
+    const allFloatArtifacts = ((data || []) as Artifact[]).map(toFloatArtifact);
+    const publicFloatArtifacts = allFloatArtifacts.filter(
       (artifact) => artifact.discovery_visibility !== "hidden"
+    );
+    const publicImageArtifacts = publicFloatArtifacts.filter((artifact) =>
+      artifact.image_url?.trim()
     );
     const floatContext = {
       atmosphere: [
-        ...new Set(publicFloatArtifacts.flatMap((artifact) => artifact.atmosphere || [])),
+        ...new Set(publicImageArtifacts.flatMap((artifact) => artifact.atmosphere || [])),
       ].slice(0, 10),
       motifs: [
-        ...new Set(publicFloatArtifacts.flatMap((artifact) => artifact.motifs || [])),
+        ...new Set(publicImageArtifacts.flatMap((artifact) => artifact.motifs || [])),
       ].slice(0, 10),
     };
     const sourceInterferenceSnippets = await getSourceInterferenceSnippets({
@@ -138,7 +139,8 @@ export default async function FloatRenderPage({
 
     return (
       <FloatExperiment
-        artifacts={publicFloatArtifacts}
+        artifacts={publicImageArtifacts}
+        centralTextArtifacts={publicFloatArtifacts}
         debugMode={debugMode}
         seed={seed}
         showControls={false}
@@ -172,6 +174,7 @@ export default async function FloatRenderPage({
   const children = ((childData || []) as Artifact[]).filter(
     (item) => item.id !== artifact.id
   );
+  const centralTextArtifacts = [artifact, ...children].map(toFloatArtifact);
   const floatArtifactMap = new Map<string, FloatExperimentArtifact>();
 
   [artifact, ...children]
@@ -209,6 +212,7 @@ export default async function FloatRenderPage({
   return (
     <FloatExperiment
       artifacts={[...floatArtifactMap.values()]}
+      centralTextArtifacts={centralTextArtifacts}
       debugMode={debugMode}
       seed={seed}
       showControls={false}
