@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   useEffect,
   useMemo,
@@ -48,6 +49,14 @@ export type FloatInterferenceSignal = {
   reason: string;
   source: string;
   text: string;
+};
+
+export type FloatCycleSnapshot = {
+  central: number;
+  image: number;
+  phase: number;
+  texture: number;
+  text: number;
 };
 
 type MemoryPiece = {
@@ -1191,9 +1200,14 @@ function AtmosphericTextureLayers() {
 
 export default function FloatExperiment({
   artifacts,
+  captureArtifactId,
+  captureSlug,
+  captureTitle,
   centralTextArtifacts,
   controls = FLOAT_CONTROL_DEFAULTS,
   debugMode,
+  freezeCycles = false,
+  initialCycles,
   returnHref = "/",
   showControls = true,
   sourceInterference = [],
@@ -1201,25 +1215,39 @@ export default function FloatExperiment({
   seed,
 }: {
   artifacts: FloatExperimentArtifact[];
+  captureArtifactId?: string;
+  captureSlug?: string;
+  captureTitle?: string;
   centralTextArtifacts?: FloatExperimentArtifact[];
   controls?: FloatControlValues;
   debugMode: boolean;
+  freezeCycles?: boolean;
+  initialCycles?: Partial<FloatCycleSnapshot>;
   returnHref?: string;
   showControls?: boolean;
   sourceInterference?: FloatInterferenceSignal[];
   videoFormat?: FloatVideoFormat;
   seed: number;
 }) {
-  const [imageCycle, setImageCycle] = useState(0);
-  const [textCycle, setTextCycle] = useState(0);
-  const [centralCycle, setCentralCycle] = useState(0);
-  const [phaseCycle, setPhaseCycle] = useState(0);
-  const [textureCycle, setTextureCycle] = useState(0);
+  const router = useRouter();
+  const [imageCycle, setImageCycle] = useState(initialCycles?.image || 0);
+  const [textCycle, setTextCycle] = useState(initialCycles?.text || 0);
+  const [centralCycle, setCentralCycle] = useState(initialCycles?.central || 0);
+  const [phaseCycle, setPhaseCycle] = useState(initialCycles?.phase || 0);
+  const [textureCycle, setTextureCycle] = useState(initialCycles?.texture || 0);
   const [rareEvent, setRareEvent] = useState(false);
   const [associationTargetTime, setAssociationTargetTime] = useState(0);
   const [clockNow, setClockNow] = useState(0);
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(!freezeCycles);
   const [quiet, setQuiet] = useState(false);
+  const [stillRendering, setStillRendering] = useState(false);
+  const [stillAttaching, setStillAttaching] = useState(false);
+  const [stillAttached, setStillAttached] = useState(false);
+  const [stillError, setStillError] = useState("");
+  const [stillResult, setStillResult] = useState<{
+    filename: string;
+    url: string;
+  } | null>(null);
   const reducedMotion = useReducedMotion();
   const phase = floatPhases[phaseCycle % floatPhases.length];
   const scene = useMemo(
@@ -1309,9 +1337,10 @@ export default function FloatExperiment({
   )}.${String(associationCountdownMs % 1000).padStart(3, "0")}`;
 
   useEffect(() => {
+    if (freezeCycles) return;
     const timer = window.setTimeout(() => setShowIntro(false), 3_800);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [freezeCycles]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(Date.now()), 250);
@@ -1319,7 +1348,7 @@ export default function FloatExperiment({
   }, []);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (freezeCycles || reducedMotion) return;
     let cancelled = false;
     let timer = 0;
     let step = 0;
@@ -1341,10 +1370,10 @@ export default function FloatExperiment({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [reducedMotion, seed]);
+  }, [freezeCycles, reducedMotion, seed]);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (freezeCycles || reducedMotion) return;
     let cancelled = false;
     let timer = 0;
     let releaseTimer = 0;
@@ -1369,10 +1398,10 @@ export default function FloatExperiment({
       window.clearTimeout(timer);
       window.clearTimeout(releaseTimer);
     };
-  }, [reducedMotion, seed]);
+  }, [freezeCycles, reducedMotion, seed]);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (freezeCycles || reducedMotion) return;
     let cancelled = false;
     let timer = 0;
     let step = 0;
@@ -1397,10 +1426,10 @@ export default function FloatExperiment({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [imageRate, quiet, reducedMotion, seed]);
+  }, [freezeCycles, imageRate, quiet, reducedMotion, seed]);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (freezeCycles || reducedMotion) return;
     let cancelled = false;
     let timer = 0;
     let step = 0;
@@ -1424,10 +1453,10 @@ export default function FloatExperiment({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [quiet, reducedMotion, seed]);
+  }, [freezeCycles, quiet, reducedMotion, seed]);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (freezeCycles || reducedMotion) return;
     let cancelled = false;
     let timer = 0;
     let step = 0;
@@ -1451,10 +1480,10 @@ export default function FloatExperiment({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [imageRate, quiet, reducedMotion, seed]);
+  }, [freezeCycles, imageRate, quiet, reducedMotion, seed]);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (freezeCycles || reducedMotion) return;
     let cancelled = false;
     let timer = 0;
     let step = 0;
@@ -1478,7 +1507,105 @@ export default function FloatExperiment({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [centerRate, quiet, reducedMotion, seed, videoFormat]);
+  }, [centerRate, freezeCycles, quiet, reducedMotion, seed, videoFormat]);
+
+  async function attachStill(result: { filename: string; url: string }) {
+    if (!captureArtifactId || stillAttaching) return;
+
+    setStillAttaching(true);
+    setStillAttached(false);
+    setStillError("");
+
+    try {
+      const imageResponse = await fetch(result.url);
+
+      if (!imageResponse.ok) {
+        throw new Error("The still was captured but could not be attached.");
+      }
+
+      const blob = await imageResponse.blob();
+      const formData = new FormData();
+      const file = new File([blob], result.filename, { type: "image/png" });
+      formData.set("image", file);
+
+      const attachResponse = await fetch(
+        `/api/artifacts/${captureArtifactId}/images`,
+        {
+          body: formData,
+          method: "POST",
+        }
+      );
+
+      if (!attachResponse.ok) {
+        throw new Error(
+          attachResponse.status === 401
+            ? "The still was captured, but attaching requires Backroom access."
+            : "The still was captured, but could not be attached."
+        );
+      }
+
+      setStillAttached(true);
+      router.refresh();
+    } catch (error) {
+      setStillError(
+        error instanceof Error
+          ? error.message
+          : "The still could not be attached."
+      );
+    } finally {
+      setStillAttaching(false);
+    }
+  }
+
+  async function captureStill() {
+    const slug = captureSlug || anchor?.artifact.slug;
+
+    if (!slug || stillRendering || stillAttaching) return;
+
+    setStillRendering(true);
+    setStillAttached(false);
+    setStillError("");
+    setStillResult(null);
+
+    try {
+      const response = await fetch("/api/float-stills", {
+        body: JSON.stringify({
+          controls,
+          cycles: {
+            central: centralCycle,
+            image: imageCycle,
+            phase: phaseCycle,
+            texture: textureCycle,
+            text: textCycle,
+          } satisfies FloatCycleSnapshot,
+          format: videoFormat || "youtube",
+          slug,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "The still could not be captured.");
+      }
+
+      const result = {
+        filename: data.filename || "elsewhere-float-still.png",
+        url: data.url,
+      };
+      setStillResult(result);
+    } catch (error) {
+      setStillError(
+        error instanceof Error ? error.message : "The still could not be captured."
+      );
+    } finally {
+      setStillRendering(false);
+      setStillAttaching(false);
+    }
+  }
 
   return (
     <main
@@ -1596,7 +1723,47 @@ export default function FloatExperiment({
               >
                 Remember Again
               </button>
+              <button
+                type="button"
+                className="border border-stone-800 bg-black/40 px-4 py-3 text-[10px] uppercase tracking-[0.3em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200 disabled:cursor-wait disabled:text-stone-700"
+                disabled={stillRendering || stillAttaching}
+                onClick={() => void captureStill()}
+              >
+                {stillRendering ? "Capturing..." : "Capture Still"}
+              </button>
             </div>
+            {(stillResult || stillError) && (
+              <div className="max-w-lg text-right text-xs leading-5 text-stone-500">
+                {stillError ? (
+                  <p className="text-red-200">{stillError}</p>
+                ) : stillResult ? (
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <span className="text-stone-500">
+                      {stillAttached
+                        ? "Poster attached to artifact."
+                        : `${captureTitle || anchor?.artifact.title || "Float"} poster captured.`}
+                    </span>
+                    <a
+                      className="border border-stone-700 px-3 py-2 text-[10px] uppercase tracking-[0.22em] text-stone-300 transition hover:border-stone-300 hover:text-white"
+                      download={stillResult.filename}
+                      href={stillResult.url}
+                    >
+                      Download PNG
+                    </a>
+                    {captureArtifactId && (
+                      <button
+                        type="button"
+                        className="border border-stone-800 px-3 py-2 text-[10px] uppercase tracking-[0.22em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200 disabled:cursor-wait disabled:text-stone-700"
+                        disabled={stillAttaching}
+                        onClick={() => void attachStill(stillResult)}
+                      >
+                        {stillAttaching ? "Attaching..." : "Attach"}
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </footer>
         )}
       </section>

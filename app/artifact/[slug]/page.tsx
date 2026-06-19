@@ -2009,6 +2009,9 @@ export default async function ArtifactPage({
     return (
       <FloatExperiment
         artifacts={floatArtifacts}
+        captureArtifactId={canEdit ? currentArtifact.id : undefined}
+        captureSlug={currentArtifact.slug}
+        captureTitle={currentArtifact.title}
         centralTextArtifacts={centralTextArtifacts}
         debugMode={artifactFloatDebugMode}
         controls={floatControls}

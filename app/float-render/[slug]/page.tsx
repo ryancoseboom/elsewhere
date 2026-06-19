@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import FloatExperiment, {
+  type FloatCycleSnapshot,
   type FloatExperimentArtifact,
   type FloatInterferenceSignal,
   type FloatVideoFormat,
@@ -37,6 +38,7 @@ type Artifact = {
 type FloatRenderSearchParams = Promise<{
   debug?: string | string[];
   format?: string | string[];
+  still?: string | string[];
 } & Record<string, string | string[] | undefined>>;
 
 const GLOBAL_FLOAT_SLUG = "__global";
@@ -80,6 +82,24 @@ function artifactType(artifact: Artifact) {
   return artifact.artifact_type || artifact.kind || "";
 }
 
+function cycleValue(value: string | string[] | undefined) {
+  const numericValue = Math.floor(Number(firstParam(value) || 0));
+
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
+}
+
+function readFloatCycles(
+  params: Record<string, string | string[] | undefined>
+): Partial<FloatCycleSnapshot> {
+  return {
+    central: cycleValue(params.cycleCentral),
+    image: cycleValue(params.cycleImage),
+    phase: cycleValue(params.cyclePhase),
+    texture: cycleValue(params.cycleTexture),
+    text: cycleValue(params.cycleText),
+  };
+}
+
 export default async function FloatRenderPage({
   params,
   searchParams,
@@ -91,6 +111,10 @@ export default async function FloatRenderPage({
   const resolvedSearchParams = await searchParams;
   const format = videoFormat(firstParam(resolvedSearchParams.format));
   const controls = readFloatControls(resolvedSearchParams);
+  const freezeCycles = ["1", "true", "still"].includes(
+    firstParam(resolvedSearchParams.still) || ""
+  );
+  const initialCycles = readFloatCycles(resolvedSearchParams);
   const debugMode = ["1", "true", "debug"].includes(
     firstParam(resolvedSearchParams.debug) || ""
   );
@@ -146,6 +170,8 @@ export default async function FloatRenderPage({
         artifacts={publicImageArtifacts}
         centralTextArtifacts={publicFloatArtifacts}
         debugMode={debugMode}
+        freezeCycles={freezeCycles}
+        initialCycles={initialCycles}
         seed={seed}
         showControls={false}
         controls={controls}
@@ -225,6 +251,8 @@ export default async function FloatRenderPage({
       artifacts={[...floatArtifactMap.values()]}
       centralTextArtifacts={centralTextArtifacts}
       debugMode={debugMode}
+      freezeCycles={freezeCycles}
+      initialCycles={initialCycles}
       seed={seed}
       showControls={false}
       controls={controls}

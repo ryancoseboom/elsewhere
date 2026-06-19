@@ -68,6 +68,10 @@ function isImageOnlyArtifact(artifact: ArchiveArtifact) {
   return ["Artwork", "Design", "Photo"].includes(artifactType(artifact));
 }
 
+function isHiddenArtifact(artifact: ArchiveArtifact) {
+  return artifact.discovery_visibility === "hidden";
+}
+
 function artifactOpenHref(artifact: ArchiveArtifact) {
   if (artifactType(artifact) === "Poster") {
     return `/posters?poster=${encodeURIComponent(artifact.slug)}`;
@@ -457,6 +461,7 @@ export default async function DriftArtifactPage({
 
   if (!current) notFound();
 
+  const currentHidden = isHiddenArtifact(current);
   const currentIsSong = artifactType(current) === "Song";
   const { data: currentLyricsData } = currentIsSong
     ? await supabase
@@ -510,7 +515,10 @@ export default async function DriftArtifactPage({
       (direction): direction is typeof direction & { preview: SignalPreview } =>
         Boolean(direction.preview)
     );
-  const audioPreviews = shuffle([current, ...attachedArtifacts])
+  const audioPreviews = shuffle([
+    ...(currentIsSong ? [] : [current]),
+    ...attachedArtifacts,
+  ])
     .filter((artifact) => artifact.audio_url?.trim())
     .slice(0, 2);
   const currentLyricFragments = currentIsSong
@@ -519,14 +527,22 @@ export default async function DriftArtifactPage({
   const backdrop = uniqueBackdrop(residueArtifacts, ordinaryArtifacts);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#090807] px-4 py-5 text-stone-200 sm:px-6 sm:py-8">
-      <div className="absolute inset-0 opacity-55">
+    <main
+      className={`relative min-h-screen overflow-hidden px-4 py-5 text-stone-200 sm:px-6 sm:py-8 ${
+        currentHidden ? "bg-[#120304]" : "bg-[#090807]"
+      }`}
+    >
+      <div className={`absolute inset-0 ${currentHidden ? "opacity-40 grayscale contrast-150" : "opacity-55"}`}>
         <div className="grid h-full grid-cols-4 grid-rows-3 gap-1 p-1 md:grid-cols-6">
           {backdrop.map(({ imageUrl, residue }) => (
             <div
               key={imageUrl}
               className={`relative overflow-hidden bg-stone-950 ${
-                residue ? "animate-pulse ring-1 ring-inset ring-stone-300/25 [animation-duration:7s]" : ""
+                residue
+                  ? `animate-pulse ring-1 ring-inset [animation-duration:7s] ${
+                      currentHidden ? "ring-red-400/45" : "ring-stone-300/25"
+                    }`
+                  : ""
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -541,8 +557,20 @@ export default async function DriftArtifactPage({
           ))}
         </div>
       </div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(9,8,7,0.22),rgba(9,8,7,0.91)_72%)]" />
-      <div className="absolute inset-0 bg-black/25" />
+      <div
+        className={`absolute inset-0 ${
+          currentHidden
+            ? "bg-[radial-gradient(circle_at_center,rgba(80,7,9,0.18),rgba(18,3,4,0.94)_70%)]"
+            : "bg-[radial-gradient(circle_at_center,rgba(9,8,7,0.22),rgba(9,8,7,0.91)_72%)]"
+        }`}
+      />
+      <div className={`absolute inset-0 ${currentHidden ? "bg-red-950/20" : "bg-black/25"}`} />
+      {currentHidden && (
+        <>
+          <div className="pointer-events-none absolute inset-x-0 top-24 h-px bg-red-500/45" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-20 h-px bg-red-500/25" />
+        </>
+      )}
 
       <div className="relative mx-auto flex min-h-[calc(100vh-2.5rem)] max-w-6xl flex-col sm:min-h-[calc(100vh-4rem)]">
         <header className="flex flex-wrap items-center justify-between gap-4 sm:gap-5">
@@ -562,10 +590,23 @@ export default async function DriftArtifactPage({
 
         <div className="grid flex-1 items-center gap-9 py-10 sm:gap-12 sm:py-12 lg:grid-cols-[minmax(0,1fr)_28rem]">
           <section>
-            <p className="text-[10px] uppercase tracking-[0.44em] text-stone-400">
-              Drift / {activeMood ? driftMoodLabel(activeMood) : current.discovery_visibility === "hidden" ? "misfiled" : artifactType(current) || "signal"}
+            <p
+              className={`text-[10px] uppercase tracking-[0.44em] ${
+                currentHidden ? "text-red-300" : "text-stone-400"
+              }`}
+            >
+              Drift / {currentHidden ? "misfiled" : activeMood ? driftMoodLabel(activeMood) : artifactType(current) || "signal"}
             </p>
-            <h1 className="mt-5 max-w-4xl font-serif text-5xl leading-none text-stone-100 sm:text-6xl md:text-8xl">
+            {currentHidden && (
+              <p className="mt-3 w-fit border border-red-500/60 bg-red-950/30 px-3 py-2 text-[9px] uppercase tracking-[0.3em] text-red-200">
+                Hidden artifact / recovered out of order
+              </p>
+            )}
+            <h1
+              className={`mt-5 max-w-4xl font-serif text-5xl leading-none sm:text-6xl md:text-8xl ${
+                currentHidden ? "text-red-400 drop-shadow-[0_0_18px_rgba(248,113,113,0.28)]" : "text-stone-100"
+              }`}
+            >
               {current.title}
             </h1>
             {currentIsSong && (
@@ -597,6 +638,23 @@ export default async function DriftArtifactPage({
                     Open artifact page
                   </Link>
                 </div>
+                {current.audio_url && (
+                  <div className="max-w-md border border-stone-800 bg-black/45 p-3">
+                    <p
+                      className={`mb-2 text-[9px] uppercase tracking-[0.2em] ${
+                        currentHidden ? "text-red-300" : "text-stone-500"
+                      }`}
+                    >
+                      {current.title}
+                    </p>
+                    <audio
+                      controls
+                      preload="metadata"
+                      src={current.audio_url}
+                      className="h-8 w-full opacity-75"
+                    />
+                  </div>
+                )}
               </div>
             )}
             {current.fragment && (
@@ -662,8 +720,12 @@ export default async function DriftArtifactPage({
                           />
                         )}
                         <span className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-3 bg-black/70 px-3 py-2">
-                          <span className="text-[8px] uppercase tracking-[0.2em] text-stone-300">
-                            Current signal / {current.title}
+                          <span
+                            className={`text-[8px] uppercase tracking-[0.2em] ${
+                              currentHidden ? "text-red-300" : "text-stone-300"
+                            }`}
+                          >
+                            Current signal / {currentHidden ? "misfiled / " : ""}{current.title}
                           </span>
                           <span className="shrink-0 border border-stone-500 bg-black/55 px-2 py-1 text-[8px] uppercase tracking-[0.2em] text-stone-200 transition group-hover:border-stone-200 group-hover:text-white">
                             Open artifact
@@ -705,7 +767,11 @@ export default async function DriftArtifactPage({
                             >
                               0{number}
                             </span>
-                            <span className="absolute inset-x-0 bottom-0 bg-black/65 px-2 py-1 text-[8px] uppercase tracking-[0.14em] text-stone-300 opacity-0 transition group-hover:opacity-100">
+                            <span
+                              className={`absolute inset-x-0 bottom-0 bg-black/65 px-2 py-1 text-[8px] uppercase tracking-[0.14em] opacity-0 transition group-hover:opacity-100 ${
+                                isHiddenArtifact(artifact) ? "text-red-300" : "text-stone-300"
+                              }`}
+                            >
                               {artifact.title}
                             </span>
                           </Link>
@@ -718,7 +784,11 @@ export default async function DriftArtifactPage({
                   <div className="mt-4 space-y-3">
                     {audioPreviews.map((preview) => (
                       <div key={preview.id}>
-                        <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-stone-500">
+                        <p
+                          className={`mb-1 text-[9px] uppercase tracking-[0.18em] ${
+                            isHiddenArtifact(preview) ? "text-red-300" : "text-stone-500"
+                          }`}
+                        >
                           {preview.title}
                         </p>
                         <audio
@@ -740,9 +810,19 @@ export default async function DriftArtifactPage({
               Choose a direction
             </p>
             <div className="mx-auto mt-4 w-fit px-5 py-3 text-center">
-              <p className="font-serif text-xl text-stone-100">{current.title}</p>
-              <p className="mt-1 text-[9px] uppercase tracking-[0.2em] text-stone-500">
-                Current signal
+              <p
+                className={`font-serif text-xl ${
+                  currentHidden ? "text-red-400" : "text-stone-100"
+                }`}
+              >
+                {current.title}
+              </p>
+              <p
+                className={`mt-1 text-[9px] uppercase tracking-[0.2em] ${
+                  currentHidden ? "text-red-300/75" : "text-stone-500"
+                }`}
+              >
+                {currentHidden ? "Misfiled signal" : "Current signal"}
               </p>
             </div>
             <div
@@ -774,9 +854,18 @@ export default async function DriftArtifactPage({
                     <p className="text-[9px] uppercase tracking-[0.2em] text-stone-400 transition group-hover:text-white">
                       {reading.prompt}
                     </p>
-                    <p className="mt-1 font-serif text-lg text-stone-200 transition group-hover:text-white">
+                    <p
+                      className={`mt-1 font-serif text-lg transition group-hover:text-white ${
+                        isHiddenArtifact(artifact) ? "text-red-400" : "text-stone-200"
+                      }`}
+                    >
                       {artifact.title}
                     </p>
+                    {isHiddenArtifact(artifact) && (
+                      <p className="mt-1 text-[8px] uppercase tracking-[0.18em] text-red-300/75 transition group-hover:text-red-200">
+                        hidden / misfiled
+                      </p>
+                    )}
                     {mood && (
                       <p className="mt-1 text-[8px] uppercase tracking-[0.18em] text-stone-600 transition group-hover:text-stone-400">
                         {driftMoodLabel(mood)}
@@ -837,7 +926,9 @@ export default async function DriftArtifactPage({
                 className="text-[10px] uppercase tracking-[0.18em] text-stone-400 transition hover:text-stone-100"
               >
                 {index > 0 && <span className="mr-3 text-stone-800">→</span>}
-                {artifact.title}
+                <span className={isHiddenArtifact(artifact) ? "text-red-400" : ""}>
+                  {artifact.title}
+                </span>
               </Link>
             ))}
           </div>

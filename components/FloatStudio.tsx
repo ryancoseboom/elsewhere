@@ -43,6 +43,16 @@ function cleanDownloadFilename(value: string) {
   return `${withoutExtension || "elsewhere-float-render"}.mp4`;
 }
 
+function cleanStillFilename(value: string) {
+  const withoutExtension = value
+    .replace(/\.png$/i, "")
+    .trim()
+    .replace(/[/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ");
+
+  return `${withoutExtension || "elsewhere-float-still"}.png`;
+}
+
 export default function FloatStudio({
   artifacts,
   defaultSlug,
@@ -58,6 +68,10 @@ export default function FloatStudio({
   const [renderError, setRenderError] = useState("");
   const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
   const [downloadFilename, setDownloadFilename] = useState("");
+  const [isCapturingStill, setIsCapturingStill] = useState(false);
+  const [stillError, setStillError] = useState("");
+  const [stillResult, setStillResult] = useState<RenderResult | null>(null);
+  const [stillFilename, setStillFilename] = useState("");
   const isGlobalFloat = slug === GLOBAL_FLOAT_SLUG;
   const selectedArtifact =
     isGlobalFloat
@@ -114,6 +128,48 @@ export default function FloatStudio({
       );
     } finally {
       setIsRendering(false);
+    }
+  }
+
+  async function captureStill() {
+    if (!selectedArtifact || isCapturingStill) return;
+
+    setIsCapturingStill(true);
+    setStillError("");
+    setStillResult(null);
+    setStillFilename("");
+
+    try {
+      const response = await fetch("/api/float-stills", {
+        body: JSON.stringify({
+          controls,
+          format,
+          slug: selectedArtifact.slug,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "The still could not be captured.");
+      }
+
+      setStillResult({
+        filename: data.filename,
+        url: data.url,
+      });
+      setStillFilename(data.filename || "");
+    } catch (error) {
+      setStillError(
+        error instanceof Error
+          ? error.message
+          : "The still could not be captured."
+      );
+    } finally {
+      setIsCapturingStill(false);
     }
   }
 
@@ -228,6 +284,14 @@ export default function FloatStudio({
                 >
                   {isRendering ? "Rendering..." : "Render Video"}
                 </button>
+                <button
+                  type="button"
+                  className="border border-stone-700 px-4 py-3 text-[10px] uppercase tracking-[0.24em] text-stone-300 transition hover:border-stone-300 hover:text-white disabled:cursor-wait disabled:border-stone-800 disabled:text-stone-600"
+                  disabled={!selectedArtifact || isCapturingStill}
+                  onClick={captureStill}
+                >
+                  {isCapturingStill ? "Capturing..." : "Capture Still"}
+                </button>
                 <a
                   className="border border-stone-700 px-4 py-3 text-[10px] uppercase tracking-[0.24em] text-stone-300 transition hover:border-stone-300 hover:text-white"
                   href={renderPath}
@@ -247,6 +311,51 @@ export default function FloatStudio({
               {renderError && (
                 <div className="mt-3 border border-red-900/70 bg-red-950/20 p-3 text-xs leading-6 text-red-200">
                   {renderError}
+                </div>
+              )}
+
+              {stillError && (
+                <div className="mt-3 border border-red-900/70 bg-red-950/20 p-3 text-xs leading-6 text-red-200">
+                  {stillError}
+                </div>
+              )}
+
+              {stillResult && (
+                <div className="mt-3 border border-stone-700 bg-[#11100e] p-3">
+                  <p className="text-[10px] uppercase tracking-[0.28em] text-stone-500">
+                    Still captured
+                  </p>
+                  <p className="mt-2 break-words text-xs text-stone-400">
+                    {stillResult.filename}
+                  </p>
+                  <label className="mt-4 block">
+                    <span className="text-[10px] uppercase tracking-[0.28em] text-stone-500">
+                      Save as
+                    </span>
+                    <input
+                      className="mt-2 w-full border border-stone-800 bg-black/30 px-3 py-3 text-sm text-stone-200 outline-none placeholder:text-stone-700"
+                      type="text"
+                      value={stillFilename}
+                      onChange={(event) => setStillFilename(event.target.value)}
+                    />
+                  </label>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <a
+                      className="border border-stone-700 px-4 py-3 text-[10px] uppercase tracking-[0.24em] text-stone-300 transition hover:border-stone-300 hover:text-white"
+                      download={cleanStillFilename(stillFilename)}
+                      href={stillResult.url}
+                    >
+                      Download PNG
+                    </a>
+                    <a
+                      className="border border-stone-800 px-4 py-3 text-[10px] uppercase tracking-[0.24em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
+                      href={stillResult.url}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Open still
+                    </a>
+                  </div>
                 </div>
               )}
 
