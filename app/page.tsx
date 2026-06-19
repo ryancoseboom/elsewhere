@@ -102,7 +102,7 @@ export default async function Home() {
         <div className="text-[9px] uppercase tracking-[0.3em] text-stone-700">
           <span>Archive transmission / ongoing</span>
           <Link
-            className="ml-4 text-stone-700 transition hover:text-stone-400"
+            className="ml-4 text-stone-500 transition hover:text-stone-200"
             href="/float-studio"
           >
             Float Studio
