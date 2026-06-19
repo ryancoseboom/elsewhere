@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
+import { cookies } from "next/headers";
 import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
@@ -27,17 +29,42 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+function AdminSessionReminder() {
+  return (
+    <aside className="fixed bottom-3 right-3 z-[100] flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 border border-amber-800/70 bg-black/85 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-amber-300 shadow-2xl shadow-black/50 backdrop-blur">
+      <span>Admin session active</span>
+      <Link
+        href="/backroom"
+        className="border-l border-amber-900/70 pl-2 text-amber-100 transition hover:text-white"
+      >
+        Backroom
+      </Link>
+      <Link
+        href="/backroom/logout"
+        className="text-amber-500 transition hover:text-amber-100"
+      >
+        Log out
+      </Link>
+    </aside>
+  );
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const isAdmin = (await cookies()).get("elsewhere_backroom")?.value === "yes";
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        {isAdmin && <AdminSessionReminder />}
+      </body>
     </html>
   );
 }

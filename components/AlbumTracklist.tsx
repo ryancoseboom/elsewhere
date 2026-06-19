@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArtifactImageButton } from "@/components/ArtifactImageExperience";
 import ArtifactMediaTitle from "@/components/ArtifactMediaTitle";
+import ExclusiveAudio from "@/components/ExclusiveAudio";
 import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
 import { getVideoEmbedUrl } from "@/lib/video";
 
@@ -191,7 +192,7 @@ export default function AlbumTracklist({
                         <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-stone-600">
                           Listen
                         </p>
-                        <audio
+                        <ExclusiveAudio
                           controls
                           src={track.audioUrl}
                           className="h-8 w-full opacity-80"
@@ -257,7 +258,7 @@ export default function AlbumTracklist({
                               title={demo.title}
                             />
                             {demo.audioUrl && (
-                              <audio
+                              <ExclusiveAudio
                                 controls
                                 src={demo.audioUrl}
                                 className="h-8 w-full opacity-80"

@@ -10,6 +10,7 @@ import ArchiveHeroImageDrop from "@/components/ArchiveHeroImageDrop";
 import ArchiveImageDrop from "@/components/ArchiveImageDrop";
 import ArchiveAudioDrop from "@/components/ArchiveAudioDrop";
 import ArchiveVideoDrop from "@/components/ArchiveVideoDrop";
+import ArtifactVideoLightboxButton from "@/components/ArtifactVideoLightboxButton";
 import ArtifactBreadcrumbLink from "@/components/ArtifactBreadcrumbLink";
 import { getVideoEmbedUrl, getYouTubeThumbnailUrl } from "@/lib/video";
 import ArtifactEphemeraPaneSelect from "@/components/ArtifactEphemeraPaneSelect";
@@ -29,6 +30,7 @@ import {
   ArtifactEphemeraGroup,
 } from "@/components/ArtifactEphemeraBrowser";
 import ArtifactPageNav from "@/components/ArtifactPageNav";
+import ExclusiveAudio from "@/components/ExclusiveAudio";
 import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
 import SourceInterference from "@/components/SourceInterference";
 import { archiveTexture, archiveTextureSet } from "@/lib/archive-textures";
@@ -272,7 +274,7 @@ function AudioChildrenSection({ items }: { items: Artifact[] }) {
               {item.title}
             </Link>
 
-            <audio
+            <ExclusiveAudio
               controls
               src={item.audio_url || ""}
               className="w-full opacity-80"
@@ -365,18 +367,6 @@ function ArchiveTools({ artifact }: { artifact: Artifact }) {
           className="block px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-stone-400 transition hover:bg-stone-900 hover:text-stone-100"
         >
           Copy this page
-        </Link>
-        <Link
-          href="/backroom"
-          className="block px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-stone-600 transition hover:bg-stone-900 hover:text-stone-300"
-        >
-          Open backroom
-        </Link>
-        <Link
-          href="/backroom/logout"
-          className="mt-2 block border-t border-stone-800 px-3 py-2 pt-3 text-[10px] uppercase tracking-[0.2em] text-stone-700 transition hover:bg-stone-900 hover:text-stone-300"
-        >
-          Log out
         </Link>
       </div>
     </details>
@@ -769,7 +759,7 @@ function MediaList({
                 )}
               </div>
               {item.audio_url && (
-                <audio
+                <ExclusiveAudio
                   controls
                   src={item.audio_url}
                   className="mt-2 w-full opacity-80"
@@ -805,12 +795,21 @@ function AudioGallery({
         {items.map((item) => (
           <div
             key={item.id}
-            className="flex min-h-36 flex-col justify-end border border-stone-800 bg-stone-950 p-4"
+            className="relative flex min-h-36 flex-col justify-end overflow-hidden border border-stone-800 bg-stone-950 p-4"
+            style={{
+              backgroundImage: `linear-gradient(135deg, rgba(12,10,9,0.22), rgba(12,10,9,0.88)), url(${archiveTexture(
+                `audio:${item.id}`
+              )})`,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+            }}
           >
+            <div className="absolute inset-0 bg-black/20" />
             {dropTargetArtifactId && item.parent_id ? (
-              <div className="mb-3 flex min-w-0">
+              <div className="relative z-10 mb-3 flex min-w-0">
                 <ArtifactMediaTitle
                   artifactId={item.id}
+                  className="block w-full whitespace-normal break-words font-sans text-xs leading-4 text-stone-200"
                   editable
                   title={item.title}
                 />
@@ -818,12 +817,16 @@ function AudioGallery({
             ) : (
               <Link
                 href={`/artifact/${item.slug}`}
-                className="mb-3 block text-sm font-serif text-stone-300 hover:text-white"
+                className="relative z-10 mb-3 block whitespace-normal break-words font-sans text-xs leading-4 text-stone-200 hover:text-white"
               >
                 {item.title}
               </Link>
             )}
-            <audio controls src={item.audio_url || ""} className="h-8 w-full opacity-80" />
+            <ExclusiveAudio
+              controls
+              src={item.audio_url || ""}
+              className="relative z-10 h-8 w-full opacity-80"
+            />
           </div>
         ))}
         {dropTargetArtifactId && (
@@ -856,50 +859,44 @@ function VideoGallery({
         <div className="grid gap-4 md:grid-cols-2">
           {items.map((item, index) => (
             <div key={item.id}>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                {canEdit && item.parent_id ? (
-                  <div className="min-w-0 flex-1">
-                    <ArtifactMediaTitle
+              <div className="group relative aspect-video overflow-hidden border border-stone-800 bg-black">
+                <ArtifactVideoLightboxButton
+                  title={item.title}
+                  videoUrl={item.video_url}
+                  youtubeUrl={item.youtube_url}
+                  thumbnailUrl={
+                    item.image_url || getYouTubeThumbnailUrl(item.youtube_url)
+                  }
+                  className="absolute inset-0 h-full w-full disabled:cursor-default"
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-3">
+                  {canEdit && item.parent_id ? (
+                    <div className="pointer-events-auto min-w-0">
+                      <ArtifactMediaTitle
+                        artifactId={item.id}
+                        className="block w-full whitespace-normal break-words font-sans text-xs leading-4 text-stone-100"
+                        editable
+                        title={item.title}
+                      />
+                    </div>
+                  ) : (
+                    <p className="whitespace-normal break-words font-sans text-xs leading-4 text-stone-100">
+                      {item.title}
+                    </p>
+                  )}
+                </div>
+                {canEdit && item.parent_id && (
+                  <div className="absolute right-2 top-2 z-10">
+                    <ArtifactSectionOrder
                       artifactId={item.id}
-                      editable
-                      title={item.title}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < items.length - 1}
+                      canDelete
+                      deleteKind="video"
                     />
                   </div>
-                ) : (
-                  <Link
-                    href={`/artifact/${item.slug}`}
-                    className="block min-w-0 flex-1 text-sm font-serif text-stone-300 hover:text-white"
-                  >
-                    {item.title}
-                  </Link>
-                )}
-                {canEdit && item.parent_id && (
-                  <ArtifactSectionOrder
-                    artifactId={item.id}
-                    canMoveUp={index > 0}
-                    canMoveDown={index < items.length - 1}
-                    canDelete
-                    deleteKind="video"
-                  />
                 )}
               </div>
-              {item.youtube_url ? (
-                <div className="aspect-video border border-stone-800 bg-black">
-                  <iframe
-                    src={getVideoEmbedUrl(item.youtube_url)}
-                    title={item.title}
-                    className="h-full w-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
-                  />
-                </div>
-              ) : (
-                <video
-                  controls
-                  src={item.video_url || ""}
-                  className="w-full border border-stone-800 opacity-90"
-                />
-              )}
             </div>
           ))}
           {dropTargetArtifactId && (
@@ -937,9 +934,9 @@ function RelatedGrid({
                 misfiled signal
               </p>
             )}
-            <p className="font-serif text-lg text-stone-300">{item.title}</p>
+            <p className="font-sans text-base text-stone-300">{item.title}</p>
             {item.fragment && (
-              <p className="mt-2 line-clamp-2 text-xs italic leading-5 text-stone-600">
+              <p className="mt-2 line-clamp-2 font-sans text-[11px] italic leading-5 text-stone-600">
                 {item.fragment}
               </p>
             )}
@@ -1343,6 +1340,38 @@ function VisualScrapbook({
           </div>
         )}
 
+        {isSongPage && (primarySpotifyUrl || videos.length > 0 || primaryLyrics) && (
+          <section
+            id="listen-watch-mobile"
+            className="mt-8 grid scroll-mt-24 gap-8 border-y border-stone-800 py-6 lg:hidden"
+          >
+            {primarySpotifyUrl && (
+              <SpotifyTrackEmbed
+                title={artifact.title}
+                url={primarySpotifyUrl}
+              />
+            )}
+            {videos.length > 0 && (
+              <VideoGallery
+                items={videos}
+                placeholder="Moving-image fragments will appear here when attached."
+                canEdit={canEdit}
+                dropTargetArtifactId={canEdit ? artifact.id : undefined}
+              />
+            )}
+            {primaryLyrics && (
+              <section id="words-mobile" className="scroll-mt-24">
+                <h2 className="mb-5 text-[10px] uppercase tracking-[0.32em] text-stone-600">
+                  Words
+                </h2>
+                <div className="whitespace-pre-line font-serif text-xl leading-9 text-stone-300">
+                  {primaryLyrics}
+                </div>
+              </section>
+            )}
+          </section>
+        )}
+
         <div
           id="overview"
           className={`grid scroll-mt-24 gap-8 lg:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.28fr)] ${
@@ -1375,11 +1404,13 @@ function VisualScrapbook({
             </div>}
 
             {primarySpotifyUrl && (
-              <SpotifyTrackEmbed
-                title={artifact.title}
-                url={primarySpotifyUrl}
-                className="mt-4"
-              />
+              <div className={isSongPage ? "hidden lg:block" : ""}>
+                <SpotifyTrackEmbed
+                  title={artifact.title}
+                  url={primarySpotifyUrl}
+                  className="mt-4"
+                />
+              </div>
             )}
 
             {isAlbumPage && albumTrackPreviews.length > 0 && !isSingleRelease && (
@@ -1417,12 +1448,14 @@ function VisualScrapbook({
                   placeholder="Alternate recordings will appear here when attached."
                 />
               )}
-              <VideoGallery
-                items={videos}
-                placeholder="Moving-image fragments will appear here when attached."
-                canEdit={canEdit}
-                dropTargetArtifactId={canEdit ? artifact.id : undefined}
-              />
+              <div className={isSongPage ? "hidden lg:block" : ""}>
+                <VideoGallery
+                  items={videos}
+                  placeholder="Moving-image fragments will appear here when attached."
+                  canEdit={canEdit}
+                  dropTargetArtifactId={canEdit ? artifact.id : undefined}
+                />
+              </div>
               <MediaList
                 title="Paper traces"
                 items={documents}
@@ -1529,7 +1562,12 @@ function VisualScrapbook({
             )}
 
             {primaryLyrics && (
-              <section id="words" className="mt-12 scroll-mt-24 border-t border-stone-800 pt-8">
+              <section
+                id="words"
+                className={`mt-12 scroll-mt-24 border-t border-stone-800 pt-8 ${
+                  isSongPage ? "hidden lg:block" : ""
+                }`}
+              >
                 <h2 className="mb-5 text-[10px] uppercase tracking-[0.32em] text-stone-600">
                   Words
                 </h2>
@@ -1609,6 +1647,7 @@ export default async function ArtifactPage({
   }
 
   const currentArtifact = artifact as Artifact;
+  const currentArtifactType = getArtifactType(currentArtifact);
 
   let allArtifactsQuery = supabase
     .from("artifacts")
@@ -1621,6 +1660,39 @@ export default async function ArtifactPage({
   }
   const { data: allArtifactsData } = await allArtifactsQuery;
 
+  const relatedArtifactConditions = [
+    `parent_id.eq.${currentArtifact.id}`,
+    `parent_slug.eq.${currentArtifact.slug}`,
+  ];
+
+  if (currentArtifactType === "Band") {
+    relatedArtifactConditions.push(`band_id.eq.${currentArtifact.id}`);
+  }
+
+  if (["Album", "Single"].includes(currentArtifactType)) {
+    relatedArtifactConditions.push(`album_id.eq.${currentArtifact.id}`);
+  }
+
+  if (currentArtifactType === "Song") {
+    relatedArtifactConditions.push(`song_id.eq.${currentArtifact.id}`);
+  }
+
+  if (currentArtifact.album_id) {
+    relatedArtifactConditions.push(`album_id.eq.${currentArtifact.album_id}`);
+  }
+
+  let relatedArtifactsQuery = supabase
+    .from("artifacts")
+    .select(ARTIFACT_INDEX_SELECT)
+    .neq("slug", currentArtifact.slug)
+    .or(relatedArtifactConditions.join(","));
+  if (!canEdit) {
+    relatedArtifactsQuery = relatedArtifactsQuery
+      .eq("is_public", true)
+      .eq("discovery_visibility", "public");
+  }
+  const { data: relatedArtifactsData } = await relatedArtifactsQuery;
+
   let hiddenArtifactsQuery = supabase
     .from("artifacts")
     .select(ARTIFACT_INDEX_SELECT)
@@ -1631,7 +1703,14 @@ export default async function ArtifactPage({
   if (canEdit) hiddenArtifactsQuery = hiddenArtifactsQuery.limit(0);
   const { data: hiddenArtifactsData } = await hiddenArtifactsQuery;
 
-  const allArtifacts = (allArtifactsData || []) as Artifact[];
+  const allArtifactsById = new Map<string, Artifact>();
+  ((allArtifactsData || []) as Artifact[]).forEach((item) =>
+    allArtifactsById.set(item.id, item)
+  );
+  ((relatedArtifactsData || []) as Artifact[]).forEach((item) =>
+    allArtifactsById.set(item.id, item)
+  );
+  const allArtifacts = [...allArtifactsById.values()];
   const hiddenArtifacts = (hiddenArtifactsData || []) as Artifact[];
 
   const artifactMap = new Map<string, Artifact>();
@@ -1692,7 +1771,6 @@ export default async function ArtifactPage({
   const songs = childArtifacts.filter(
     (child) => getArtifactType(child) === "Song"
   );
-  const currentArtifactType = getArtifactType(currentArtifact);
   const isBandPage = currentArtifactType === "Band";
   const isAlbumPage = currentArtifactType === "Album";
   const isSingleRelease = currentArtifactType === "Single";
@@ -2174,12 +2252,6 @@ export default async function ArtifactPage({
                 </Link>
               )}
 
-              <Link
-                href="/backroom"
-                className="rounded-full border border-stone-800 px-6 py-3 text-xs uppercase tracking-[0.25em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
-              >
-                Backroom
-              </Link>
             </div>
           </section>
         </article>

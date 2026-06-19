@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ExclusiveAudio from "@/components/ExclusiveAudio";
 
 type AudioFrameProps = {
   audioUrl: string;
@@ -57,8 +58,8 @@ export default function AudioFrame({ audioUrl, imageUrl }: AudioFrameProps) {
         if (!count) return;
 
         r = Math.floor((r / count) * 0.85);
-g = Math.floor((g / count) * 0.85);
-b = Math.floor((b / count) * 0.85);
+        g = Math.floor((g / count) * 0.85);
+        b = Math.floor((b / count) * 0.85);
 
         setFrameColor(`rgb(${r}, ${g}, ${b})`);
       } catch {
@@ -72,7 +73,7 @@ b = Math.floor((b / count) * 0.85);
       className="mt-6 max-w-2xl border border-stone-800 p-4"
       style={{ backgroundColor: frameColor }}
     >
-      <audio controls src={audioUrl} className="w-full opacity-90" />
+      <ExclusiveAudio controls src={audioUrl} className="w-full opacity-90" />
     </div>
   );
 }
