@@ -36,6 +36,8 @@ import SourceInterference from "@/components/SourceInterference";
 import { archiveTexture, archiveTextureSet } from "@/lib/archive-textures";
 
 const ELSEWHERE_ATMOSPHERE_V2 = true;
+export const dynamic = "force-dynamic";
+
 const ARTIFACT_PAGE_SELECT =
   "id, slug, title, kind, artifact_type, parent_id, band_id, album_id, song_id, parent_slug, description, fragment, atmosphere, motifs, rooms, nearby, image_url, audio_url, video_url, youtube_url, spotify_url, lyrics, discovery_visibility, album, year, era, sort_order";
 const ARTIFACT_INDEX_SELECT =
