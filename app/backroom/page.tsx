@@ -167,6 +167,107 @@ function visibilityLabel(artifact: Artifact) {
   return artifact.discovery_visibility || "Public";
 }
 
+function normalizedReference(value: string | null | undefined) {
+  return (value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/&/g, "and")
+    .replace(/['"]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function referencesArtifact(
+  value: string | null | undefined,
+  artifact: Artifact
+) {
+  const reference = normalizedReference(value);
+
+  return (
+    reference.length > 0 &&
+    (reference === normalizedReference(artifact.slug) ||
+      reference === normalizedReference(artifact.title))
+  );
+}
+
+function isRelease(artifact: Artifact) {
+  return ["Album", "Single"].includes(artifactType(artifact));
+}
+
+function isBandRelease(band: Artifact, release: Artifact) {
+  return (
+    isRelease(release) &&
+    (release.band_id === band.id ||
+      release.parent_id === band.id ||
+      referencesArtifact(release.parent_slug, band))
+  );
+}
+
+function isReleaseTrack(release: Artifact, track: Artifact) {
+  return (
+    artifactType(track) === "Song" &&
+    (track.album_id === release.id ||
+      track.parent_id === release.id ||
+      referencesArtifact(track.parent_slug, release) ||
+      referencesArtifact(track.album, release))
+  );
+}
+
+function isDirectBandSong(
+  band: Artifact,
+  artifact: Artifact,
+  releases: Artifact[]
+) {
+  if (artifactType(artifact) !== "Song" || artifact.album_id) return false;
+  if (releases.some((release) => isReleaseTrack(release, artifact))) return false;
+
+  return (
+    artifact.band_id === band.id ||
+    artifact.parent_id === band.id ||
+    referencesArtifact(artifact.parent_slug, band)
+  );
+}
+
+function releaseTrackStrength(release: Artifact, track: Artifact) {
+  if (track.album_id === release.id) return 5;
+  if (track.parent_id === release.id) return 4;
+  if (referencesArtifact(track.parent_slug, release)) return 3;
+  if (referencesArtifact(track.album, release)) return 2;
+  return 0;
+}
+
+function compareReleaseTrackCandidate(
+  release: Artifact,
+  left: Artifact,
+  right: Artifact
+) {
+  const strengthDifference =
+    releaseTrackStrength(release, right) - releaseTrackStrength(release, left);
+
+  if (strengthDifference) return strengthDifference;
+
+  return compareArtifacts(left, right);
+}
+
+function uniqueReleaseTracks(release: Artifact, tracks: Artifact[]) {
+  const tracksByTitle = new Map<string, Artifact>();
+
+  tracks.forEach((track) => {
+    const key = normalizedReference(track.title);
+    const current = tracksByTitle.get(key);
+
+    if (
+      !current ||
+      compareReleaseTrackCandidate(release, track, current) < 0
+    ) {
+      tracksByTitle.set(key, track);
+    }
+  });
+
+  return [...tracksByTitle.values()].sort(compareArtifacts);
+}
+
 function directMaterialKinds(
   artifact: Artifact,
   artifactIdsWithLyrics: Set<string>
@@ -261,6 +362,15 @@ function ActionLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
+function materialBadgeClass(kind: string) {
+  if (kind === "audio") return "border-sky-950 bg-sky-950/20 text-sky-500";
+  if (kind === "lyrics") return "border-amber-950 bg-amber-950/20 text-amber-500";
+  if (kind === "video") return "border-fuchsia-950 bg-fuchsia-950/20 text-fuchsia-500";
+  if (kind === "image") return "border-emerald-950 bg-emerald-950/20 text-emerald-500";
+  if (kind === "spotify") return "border-green-950 bg-green-950/20 text-green-500";
+  return "border-stone-800 bg-neutral-950 text-stone-500";
+}
+
 function EditLinks({ artifact }: { artifact: Artifact }) {
   return (
     <div className="flex gap-3">
@@ -277,6 +387,88 @@ function EditLinks({ artifact }: { artifact: Artifact }) {
         Edit
       </Link>
     </div>
+  );
+}
+
+function CatalogRow({
+  artifact,
+  artifactIdsWithLyrics,
+  depth = 0,
+}: {
+  artifact: Artifact;
+  artifactIdsWithLyrics: Set<string>;
+  depth?: number;
+}) {
+  const type = artifactType(artifact) || "Unclassified";
+  const materialKinds = directMaterialKinds(artifact, artifactIdsWithLyrics);
+  const isSong = type === "Song";
+
+  return (
+    <div
+      className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+      style={{ paddingLeft: `${depth * 1.1}rem` }}
+    >
+      <div className="min-w-0">
+        <p className="truncate text-sm text-stone-200">{artifact.title}</p>
+        <p className="mt-1 truncate text-xs text-stone-700">
+          {artifact.album ||
+            artifact.parent_slug ||
+            relationshipLabel(artifact) ||
+            artifact.slug}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="border border-stone-800 bg-neutral-950 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-stone-500">
+            {type}
+          </span>
+          <span className="border border-stone-800 bg-neutral-950 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-stone-500">
+            {visibilityLabel(artifact)}
+          </span>
+          {materialKinds.map((kind) => (
+            <span
+              key={kind}
+              className={`border px-2 py-1 text-[9px] uppercase tracking-[0.18em] ${materialBadgeClass(kind)}`}
+            >
+              {kind}
+            </span>
+          ))}
+          {isSong && !artifactIdsWithLyrics.has(artifact.id) && (
+            <span className="border border-amber-950 bg-amber-950/20 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-amber-500">
+              Lyrics missing
+            </span>
+          )}
+          {isSong && !filled(artifact.spotify_url) && (
+            <span className="border border-sky-950 bg-sky-950/20 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-sky-500">
+              Spotify missing
+            </span>
+          )}
+        </div>
+      </div>
+      <EditLinks artifact={artifact} />
+    </div>
+  );
+}
+
+function CatalogGroup({
+  children,
+  count,
+  title,
+}: {
+  children: ReactNode;
+  count?: number;
+  title: string;
+}) {
+  return (
+    <section className="border-t border-stone-900 pt-5">
+      <div className="mb-2 flex items-center justify-between gap-4">
+        <h3 className="font-serif text-xl text-stone-200">{title}</h3>
+        {typeof count === "number" && (
+          <span className="text-[10px] uppercase tracking-[0.2em] text-stone-700">
+            {count}
+          </span>
+        )}
+      </div>
+      <div className="divide-y divide-stone-900">{children}</div>
+    </section>
   );
 }
 
@@ -447,7 +639,42 @@ export default async function BackroomPage({
     QUEUE_LIMIT
   );
   const visibleOrphanArtifacts = orphanArtifacts.slice(0, QUEUE_LIMIT);
-  const visibleSearchResults = searchResults.slice(0, 60);
+  const catalogArtifacts = searchQuery ? searchResults : artifacts;
+  const visibleCatalogArtifacts = catalogArtifacts.slice(0, 250);
+  const catalogArtifactIds = new Set(catalogArtifacts.map((artifact) => artifact.id));
+  const bandCatalog = artifacts
+    .filter((artifact) => artifactType(artifact) === "Band")
+    .sort(compareArtifacts);
+  const catalogDestinationIds = new Set<string>();
+  const looseCatalogArtifacts: Artifact[] = [];
+  const catalogHas = (artifact: Artifact) => catalogArtifactIds.has(artifact.id);
+
+  bandCatalog.forEach((band) => {
+    if (!searchQuery || catalogHas(band)) catalogDestinationIds.add(band.id);
+
+    const releases = artifacts
+      .filter((artifact) => isBandRelease(band, artifact))
+      .sort(compareArtifacts);
+
+    releases.forEach((release) => {
+      if (!searchQuery || catalogHas(release)) catalogDestinationIds.add(release.id);
+
+      uniqueReleaseTracks(release, songs).forEach((track) => {
+        if (!searchQuery || catalogHas(track)) catalogDestinationIds.add(track.id);
+      });
+    });
+
+    artifacts
+      .filter((artifact) => isDirectBandSong(band, artifact, releases))
+      .forEach((song) => {
+        if (!searchQuery || catalogHas(song)) catalogDestinationIds.add(song.id);
+      });
+  });
+
+  catalogArtifacts
+    .filter((artifact) => !catalogDestinationIds.has(artifact.id))
+    .sort(compareArtifacts)
+    .forEach((artifact) => looseCatalogArtifacts.push(artifact));
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-16 text-stone-200">
@@ -563,62 +790,43 @@ export default async function BackroomPage({
           </div>
         </section>
 
-        {searchQuery && (
-          <section className="mb-10 border border-stone-800 bg-stone-950/60 p-6">
-            <div className="mb-5 flex items-end justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-stone-500">
-                  Search results
-                </p>
-                <h2 className="mt-3 font-serif text-3xl text-stone-100">
-                  {searchResults.length} match
-                  {searchResults.length === 1 ? "" : "es"}
-                </h2>
-              </div>
-              <span className="text-xs text-stone-600">
-                {visibleSearchResults.length < searchResults.length
-                  ? `Showing ${visibleSearchResults.length}`
-                  : searchQuery}
-              </span>
+        <section className="mb-10 border border-stone-800 bg-stone-950/60 p-6">
+          <div className="mb-6 flex flex-col gap-4 border-b border-stone-900 pb-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-stone-500">
+                Archive catalog
+              </p>
+              <h2 className="mt-3 font-serif text-3xl text-stone-100">
+                {searchQuery
+                  ? `${catalogArtifacts.length} match${
+                      catalogArtifacts.length === 1 ? "" : "es"
+                    }`
+                  : "Browse and edit"}
+              </h2>
             </div>
+            <span className="text-xs text-stone-600">
+              {searchQuery
+                ? visibleCatalogArtifacts.length < catalogArtifacts.length
+                  ? `Showing ${visibleCatalogArtifacts.length}`
+                  : searchQuery
+                : `${songs.length} songs / ${artifacts.length} artifacts`}
+            </span>
+          </div>
 
-            {searchResults.length > 0 ? (
+          {searchQuery ? (
+            catalogArtifacts.length > 0 ? (
               <div className="divide-y divide-stone-900">
-                {visibleSearchResults.map((artifact) => (
-                  <div
+                {visibleCatalogArtifacts.map((artifact) => (
+                  <CatalogRow
                     key={artifact.id}
-                    className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <p className="text-sm text-stone-200">{artifact.title}</p>
-                      <p className="mt-1 text-xs text-stone-700">
-                        {artifact.album ||
-                          artifact.parent_slug ||
-                          relationshipLabel(artifact) ||
-                          artifact.slug}
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="border border-stone-800 bg-neutral-950 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-stone-500">
-                          {artifactType(artifact) || "Unclassified"}
-                        </span>
-                        <span className="border border-stone-800 bg-neutral-950 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-stone-500">
-                          {visibilityLabel(artifact)}
-                        </span>
-                        {!artifactIdsWithLyrics.has(artifact.id) &&
-                          artifactType(artifact) === "Song" && (
-                            <span className="border border-amber-950 bg-amber-950/20 px-2 py-1 text-[9px] uppercase tracking-[0.18em] text-amber-500">
-                              Lyrics missing
-                            </span>
-                          )}
-                      </div>
-                    </div>
-                    <EditLinks artifact={artifact} />
-                  </div>
+                    artifact={artifact}
+                    artifactIdsWithLyrics={artifactIdsWithLyrics}
+                  />
                 ))}
-                {searchResults.length > visibleSearchResults.length && (
+                {catalogArtifacts.length > visibleCatalogArtifacts.length && (
                   <p className="py-4 text-xs text-stone-600">
-                    Showing {visibleSearchResults.length} of{" "}
-                    {searchResults.length}. Narrow the search to see fewer.
+                    Showing {visibleCatalogArtifacts.length} of{" "}
+                    {catalogArtifacts.length}. Narrow the search to see fewer.
                   </p>
                 )}
               </div>
@@ -626,9 +834,88 @@ export default async function BackroomPage({
               <p className="border border-stone-800 bg-neutral-950 p-4 text-sm text-stone-500">
                 No artifacts matched that search.
               </p>
-            )}
-          </section>
-        )}
+            )
+          ) : (
+            <div className="space-y-8">
+              {bandCatalog.map((band) => {
+                const releases = artifacts
+                  .filter((artifact) => isBandRelease(band, artifact))
+                  .sort(compareArtifacts);
+                const directBandSongs = artifacts
+                  .filter((artifact) => isDirectBandSong(band, artifact, releases))
+                  .sort(compareArtifacts);
+                const rowCount =
+                  1 +
+                  releases.length +
+                  directBandSongs.length +
+                  releases.reduce(
+                    (count, release) =>
+                      count + uniqueReleaseTracks(release, songs).length,
+                    0
+                  );
+
+                return (
+                  <CatalogGroup key={band.id} title={band.title} count={rowCount}>
+                    <CatalogRow
+                      artifact={band}
+                      artifactIdsWithLyrics={artifactIdsWithLyrics}
+                    />
+                    {releases.map((release) => {
+                      const tracks = uniqueReleaseTracks(release, songs);
+
+                      return (
+                        <div key={release.id}>
+                          <CatalogRow
+                            artifact={release}
+                            artifactIdsWithLyrics={artifactIdsWithLyrics}
+                            depth={1}
+                          />
+                          {tracks.map((track) => (
+                            <CatalogRow
+                              key={track.id}
+                              artifact={track}
+                              artifactIdsWithLyrics={artifactIdsWithLyrics}
+                              depth={2}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })}
+                    {directBandSongs.map((song) => (
+                      <CatalogRow
+                        key={song.id}
+                        artifact={song}
+                        artifactIdsWithLyrics={artifactIdsWithLyrics}
+                        depth={1}
+                      />
+                    ))}
+                  </CatalogGroup>
+                );
+              })}
+
+              {looseCatalogArtifacts.length > 0 && (
+                <CatalogGroup
+                  title="Other artifacts"
+                  count={looseCatalogArtifacts.length}
+                >
+                  {looseCatalogArtifacts.slice(0, 300).map((artifact) => (
+                    <CatalogRow
+                      key={artifact.id}
+                      artifact={artifact}
+                      artifactIdsWithLyrics={artifactIdsWithLyrics}
+                    />
+                  ))}
+                  {looseCatalogArtifacts.length > 300 && (
+                    <p className="py-4 text-xs text-stone-600">
+                      Showing 300 of {looseCatalogArtifacts.length}. Use search
+                      to narrow this section.
+                    </p>
+                  )}
+                </CatalogGroup>
+              )}
+            </div>
+          )}
+        </section>
 
         {artifacts.length > 0 ? (
           <div className="grid gap-6 lg:grid-cols-2">
