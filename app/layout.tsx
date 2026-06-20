@@ -40,12 +40,14 @@ function AdminSessionReminder() {
       >
         Backroom
       </Link>
-      <Link
-        href="/backroom/logout"
-        className="text-amber-500 transition hover:text-amber-100"
-      >
-        Log out
-      </Link>
+      <form action="/backroom/logout" method="post">
+        <button
+          type="submit"
+          className="text-amber-500 transition hover:text-amber-100"
+        >
+          Log out
+        </button>
+      </form>
     </aside>
   );
 }

@@ -479,12 +479,14 @@ export default async function BackroomPage({
               )}
             </div>
 
-            <Link
-              href="/backroom/logout"
-              className="inline-flex w-fit border border-stone-800 px-5 py-3 text-xs uppercase tracking-[0.25em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
-            >
-              Log out
-            </Link>
+            <form action="/backroom/logout" method="post">
+              <button
+                type="submit"
+                className="inline-flex w-fit border border-stone-800 px-5 py-3 text-xs uppercase tracking-[0.25em] text-stone-500 transition hover:border-stone-500 hover:text-stone-200"
+              >
+                Log out
+              </button>
+            </form>
           </div>
         </header>
 

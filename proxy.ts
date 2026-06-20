@@ -9,17 +9,11 @@ export function proxy(request: NextRequest) {
     }
 
     if (request.nextUrl.pathname === "/backroom/logout") {
-      const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = "/backroom/login";
-      loginUrl.search = "?loggedOut=1";
-      const response = NextResponse.redirect(loginUrl);
-      response.cookies.set("elsewhere_backroom", "", {
-        httpOnly: true,
-        maxAge: 0,
-        path: "/",
-        sameSite: "lax",
-      });
-      return response;
+      if (request.method !== "POST") {
+        return new Response(null, { status: 204 });
+      }
+
+      return NextResponse.next();
     }
 
     if (request.cookies.get("elsewhere_backroom")?.value === "yes") {
