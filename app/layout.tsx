@@ -22,10 +22,12 @@ export const metadata: Metadata = {
     default: "Elsewhere",
     template: "%s / Elsewhere",
   },
-  description: "An unstable archive of recordings, images, and incomplete transmissions.",
+  description:
+    "Over 25 years of Halou recordings, photos, fragments, false starts, and things we thought were gone.",
   openGraph: {
     title: "Elsewhere",
-    description: "An unstable archive of recordings, images, and incomplete transmissions.",
+    description:
+      "Over 25 years of Halou recordings, photos, fragments, false starts, and things we thought were gone.",
     type: "website",
   },
 };

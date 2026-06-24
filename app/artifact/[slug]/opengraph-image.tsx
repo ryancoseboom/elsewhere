@@ -7,7 +7,7 @@ import {
   getArtifactShareData,
 } from "@/lib/artifact-share";
 
-export const alt = "Elsewhere archive preview";
+export const alt = "Elsewhere page preview";
 export const size = artifactShareImageSize;
 export const contentType = "image/png";
 export const dynamic = "force-dynamic";
@@ -29,10 +29,10 @@ export default async function ArtifactOpenGraphImage({
   const { slug } = await params;
   const artifact = await getArtifactShareData(slug);
   const title = artifact?.title || "Elsewhere";
-  const type = artifact ? artifactShareType(artifact) : "Archive fragment";
+  const type = artifact ? artifactShareType(artifact) : "Record";
   const description = artifact
     ? artifactShareDescription(artifact)
-    : "An unstable archive of recordings, images, and incomplete transmissions.";
+    : "Halou recordings, photos, notes, and things we thought were gone.";
   const visualUrl = artifact ? artifactShareVisualUrl(artifact) : "";
   const accent = threadColor(slug);
 
@@ -182,7 +182,7 @@ export default async function ArtifactOpenGraphImage({
               textTransform: "uppercase",
             }}
           >
-            Archive transmission / elsewhere
+            Halou / elsewhere
           </div>
         </div>
       </div>

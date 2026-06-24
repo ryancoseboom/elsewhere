@@ -108,7 +108,7 @@ function driftReadings(
     candidate.album_id === current.id ||
     candidate.song_id === current.id
   ) {
-    readings.push({ key: "deeper", prompt: "Move deeper into the signal" });
+    readings.push({ key: "deeper", prompt: "Move deeper into the record" });
   }
 
   if (
@@ -168,7 +168,7 @@ function driftReadings(
   if (current.band_id && current.band_id === candidate.band_id) {
     readings.push({
       key: "transmission",
-      prompt: "Remain with this transmission",
+      prompt: "Stay with this era",
     });
   }
 
@@ -177,7 +177,7 @@ function driftReadings(
   }
 
   if (artifactType(candidate) === "Poster") {
-    readings.push({ key: "poster", prompt: "Follow a live paper signal" });
+    readings.push({ key: "poster", prompt: "Follow a live flyer" });
   }
 
   if (candidate.video_url?.trim() || candidate.youtube_url?.trim()) {
@@ -189,7 +189,7 @@ function driftReadings(
   }
 
   if (candidate.lyrics?.trim()) {
-    readings.push({ key: "lyrics", prompt: "Read the words under the signal" });
+    readings.push({ key: "lyrics", prompt: "Read the words underneath" });
   }
 
   if (candidate.fragment?.trim()) {
@@ -595,7 +595,7 @@ export default async function DriftArtifactPage({
                 currentHidden ? "text-red-300" : "text-stone-400"
               }`}
             >
-              Drift / {currentHidden ? "misfiled" : activeMood ? driftMoodLabel(activeMood) : artifactType(current) || "signal"}
+              Drift / {currentHidden ? "misfiled" : activeMood ? driftMoodLabel(activeMood) : artifactType(current) || "record"}
             </p>
             {currentHidden && (
               <p className="mt-3 w-fit border border-red-500/60 bg-red-950/30 px-3 py-2 text-[9px] uppercase tracking-[0.3em] text-red-200">
@@ -694,7 +694,7 @@ export default async function DriftArtifactPage({
             {(currentPreview || directionPreviews.length > 0 || audioPreviews.length > 0) && (
               <div className="mt-9 max-w-2xl border-t border-stone-700/80 pt-5">
                 <p className="text-[9px] uppercase tracking-[0.34em] text-stone-500">
-                  Signal previews
+                  Preview pieces
                 </p>
                 {(currentPreview || directionPreviews.length > 0) && (
                   <div className="mt-4 max-w-3xl">
@@ -725,7 +725,7 @@ export default async function DriftArtifactPage({
                               currentHidden ? "text-red-300" : "text-stone-300"
                             }`}
                           >
-                            Current signal / {currentHidden ? "misfiled / " : ""}{current.title}
+                            Current piece / {currentHidden ? "misfiled / " : ""}{current.title}
                           </span>
                           <span className="shrink-0 border border-stone-500 bg-black/55 px-2 py-1 text-[8px] uppercase tracking-[0.2em] text-stone-200 transition group-hover:border-stone-200 group-hover:text-white">
                             Open artifact
@@ -806,6 +806,10 @@ export default async function DriftArtifactPage({
           </section>
 
           <aside className="lg:pt-4">
+            <p className="mx-auto mb-5 max-w-sm text-center text-xs leading-6 text-stone-500">
+              Surrender to the pull and you may find unreleased demos, unseen
+              photos, old posters, studio notes, and loose pieces.
+            </p>
             <p className="text-center text-[10px] uppercase tracking-[0.34em] text-stone-300">
               Choose a direction
             </p>
@@ -822,7 +826,7 @@ export default async function DriftArtifactPage({
                   currentHidden ? "text-red-300/75" : "text-stone-500"
                 }`}
               >
-                {currentHidden ? "Misfiled signal" : "Current signal"}
+                {currentHidden ? "Misfiled piece" : "Current piece"}
               </p>
             </div>
             <div

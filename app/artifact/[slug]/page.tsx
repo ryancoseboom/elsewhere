@@ -795,7 +795,7 @@ function MediaList({
 
   return (
     <section className="border-t border-stone-800 pt-6">
-      <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-300">
         {title}
       </p>
       {items.length > 0 ? (
@@ -855,7 +855,7 @@ function AudioGallery({
 
   return (
     <section className="border-t border-stone-800 pt-6">
-      <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-300">
         {title}
       </p>
       <div className="grid gap-4 md:grid-cols-2">
@@ -919,7 +919,7 @@ function VideoGallery({
 
   return (
     <section className="border-t border-stone-800 pt-6">
-      <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-300">
         Watch
       </p>
       {items.length > 0 || dropTargetArtifactId ? (
@@ -986,7 +986,7 @@ function RelatedGrid({
 
   return (
     <section>
-      <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-600">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.25em] text-stone-300">
         Nearby
       </p>
       <div className="grid gap-px bg-stone-800 sm:grid-cols-2">
@@ -994,14 +994,16 @@ function RelatedGrid({
           <Link
             key={item.id}
             href={`/artifact/${item.slug}`}
-            className="bg-neutral-950 p-4 transition hover:bg-stone-900"
+            className="group bg-neutral-950 p-4 transition hover:bg-stone-900"
           >
             {item.hiddenDiscovery && (
               <p className="mb-3 text-[9px] uppercase tracking-[0.24em] text-red-900">
                 misfiled signal
               </p>
             )}
-            <p className="font-sans text-base text-stone-300">{item.title}</p>
+            <p className="font-sans text-base text-stone-500 transition group-hover:text-stone-300">
+              {item.title}
+            </p>
             {item.fragment && (
               <p className="mt-2 line-clamp-2 font-sans text-[11px] italic leading-5 text-stone-600">
                 {item.fragment}
@@ -1584,7 +1586,7 @@ function VisualScrapbook({
                     : ""
                 }`}
               >
-                <h2 className="mb-6 text-[10px] uppercase tracking-[0.36em] text-stone-500">
+                <h2 className="mb-6 text-[10px] uppercase tracking-[0.36em] text-stone-300">
                   Ephemera
                 </h2>
                 <ArtifactEphemeraBrowser panes={ephemeraPanes}>

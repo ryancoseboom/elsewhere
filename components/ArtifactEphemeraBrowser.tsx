@@ -34,16 +34,16 @@ export function ArtifactEphemeraBrowser({
               <a
                 key={pane.id}
                 href={`#${pane.id}`}
-                className="text-[10px] uppercase tracking-[0.2em] text-stone-500 transition hover:text-stone-100"
+                className="text-[10px] uppercase tracking-[0.2em] text-stone-300 transition hover:text-white"
               >
-                {pane.label} <span className="text-stone-700">{pane.count}</span>
+                {pane.label} <span className="text-stone-500">{pane.count}</span>
               </a>
             ))}
           </nav>
           <button
             type="button"
             aria-pressed={contactSheet}
-            className="border border-stone-800 px-3 py-2 text-[9px] uppercase tracking-[0.2em] text-stone-500 transition hover:border-stone-500 hover:text-stone-100"
+            className="border border-stone-700 px-3 py-2 text-[9px] uppercase tracking-[0.2em] text-stone-300 transition hover:border-stone-400 hover:text-white"
             onClick={() => setContactSheet((current) => !current)}
           >
             {contactSheet ? "Expressive view" : "Contact sheet"}
@@ -77,8 +77,8 @@ export function ArtifactEphemeraGroup({
   return (
     <section id={id} className="scroll-mt-24 border-t border-stone-800 pt-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-[10px] uppercase tracking-[0.28em] text-stone-500">
-          {label} <span className="text-stone-700">{count}</span>
+        <h3 className="text-[10px] uppercase tracking-[0.28em] text-stone-300">
+          {label} <span className="text-stone-500">{count}</span>
         </h3>
         {canCollapse && (
           <button

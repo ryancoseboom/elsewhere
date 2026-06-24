@@ -197,11 +197,13 @@ function MapNode({
   meta?: string;
   tone?: "band" | "release" | "signal";
 }) {
+  const showThumbnail = tone === "release" && Boolean(artifact.image_url);
+
   return (
     <Link
       href={`/artifact/${artifact.slug}`}
       style={{ "--map-node-accent": accentColor } as CSSProperties}
-      className={`group/node relative z-10 block px-1 py-2 transition outline-none focus-visible:text-white ${
+      className={`group/node relative z-10 flex items-center gap-3 px-1 py-2 transition outline-none focus-visible:text-white ${
         tone === "band"
           ? "px-2 py-3"
           : tone === "release"
@@ -213,18 +215,30 @@ function MapNode({
         aria-hidden
         className="absolute left-0 top-1/2 h-8 w-px -translate-y-1/2 bg-[var(--map-node-accent)] opacity-0 transition group-hover/node:opacity-70 group-focus-visible/node:opacity-90"
       />
-      <p
-        className={`font-serif text-stone-300 transition group-hover/node:text-white group-focus-visible/node:text-white ${
-          tone === "band" ? "text-2xl" : tone === "release" ? "text-lg" : "text-sm"
-        }`}
-      >
-        {artifact.title}
-      </p>
-      {meta && (
-        <p className="mt-1 text-[9px] uppercase tracking-[0.2em] text-stone-600 transition group-hover/node:text-stone-400 group-focus-visible/node:text-stone-400">
-          {meta}
-        </p>
+      {showThumbnail && (
+        <span className="hidden h-12 w-12 shrink-0 overflow-hidden border border-stone-800 bg-stone-950 opacity-65 transition group-hover/node:border-stone-600 group-hover/node:opacity-95 group-focus-visible/node:border-stone-600 group-focus-visible/node:opacity-95 sm:block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={artifact.image_url || ""}
+            alt=""
+            className="h-full w-full object-cover grayscale transition duration-500 group-hover/node:grayscale-0 group-focus-visible/node:grayscale-0"
+          />
+        </span>
       )}
+      <span className="min-w-0">
+        <p
+          className={`font-serif text-stone-300 transition group-hover/node:text-white group-focus-visible/node:text-white ${
+            tone === "band" ? "text-2xl" : tone === "release" ? "text-lg" : "text-sm"
+          }`}
+        >
+          {artifact.title}
+        </p>
+        {meta && (
+          <p className="mt-1 text-[9px] uppercase tracking-[0.2em] text-stone-600 transition group-hover/node:text-stone-400 group-focus-visible/node:text-stone-400">
+            {meta}
+          </p>
+        )}
+      </span>
     </Link>
   );
 }
@@ -284,7 +298,7 @@ export default async function ExplorePage() {
               ← Elsewhere
             </Link>
             <p className="mt-12 text-[10px] uppercase tracking-[0.48em] text-stone-600">
-              Archive topology / live map
+              Release map / live catalog
             </p>
             <h1 className="mt-4 font-serif text-7xl text-stone-100 md:text-9xl">
               Explore
@@ -292,8 +306,10 @@ export default async function ExplorePage() {
           </div>
           <div className="max-w-sm">
             <p className="text-xs leading-6 text-stone-600">
-              Follow the visible structure. Every labeled junction is a
-              destination. Lines indicate containment, not chronology.
+              Start with a band, then follow releases, songs, demos, photos,
+              and loose pieces outward. The lines show what belongs together,
+              not when it happened. If something is missing, did it even really
+              happen at all?
             </p>
             <div
               aria-label="Explore map legend"
@@ -322,7 +338,7 @@ export default async function ExplorePage() {
           <div className="mx-auto w-fit px-8 py-4 text-center">
             <p className="font-serif text-3xl text-stone-100">Elsewhere</p>
             <p className="mt-2 text-[9px] uppercase tracking-[0.28em] text-stone-500">
-              Archive root
+              All paths begin here
             </p>
           </div>
           <div
@@ -484,7 +500,7 @@ export default async function ExplorePage() {
           return (
             <section className="mt-16 border-t border-stone-800 pt-7">
               <p className="mb-5 text-[10px] uppercase tracking-[0.34em] text-stone-600">
-                Unplaced signals
+                Loose records
               </p>
               <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
                 {looseSignals.map((artifact) => (

@@ -68,8 +68,8 @@ export default async function GlobalFloatPage({
       supabase,
     });
   const sourceInterference = [
-    ...sourceInterferenceSnippets,
     ...getLaunchInterferenceSnippets(floatContext, 10),
+    ...sourceInterferenceSnippets,
   ].map((snippet) => ({
     reason: snippet.tone,
     source: snippet.sourceTitle,

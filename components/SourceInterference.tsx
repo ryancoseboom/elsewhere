@@ -22,18 +22,18 @@ function fallbackSnippets(
   limit: number
 ): SourceInterferenceSnippet[] {
   const fragments = [
-    context.artifactSlug && `artifact signal / ${context.artifactSlug}`,
-    context.room && `room interference / ${context.room.replaceAll("-", " ")}`,
+    context.artifactSlug && `file card / ${context.artifactSlug}`,
+    context.room && `room note / ${context.room.replaceAll("-", " ")}`,
     context.motif && `motif recurrence / ${context.motif}`,
     ...(context.motifs || []).map((motif) => `motif recurrence / ${motif}`),
-    ...(context.atmosphere || []).map((mood) => `atmosphere drift / ${mood}`),
+    ...(context.atmosphere || []).map((mood) => `mood tag / ${mood}`),
   ].filter((fragment): fragment is string => Boolean(fragment));
 
   return fragments.slice(0, limit).map((fragment, index) => ({
-    sourceTitle: "Elsewhere archive",
-    sourceUrl: `/drift/${context.artifactSlug || "coco"}?signal=${index}`,
+    sourceTitle: "Elsewhere note",
+    sourceUrl: `/drift/${context.artifactSlug || "coco"}?note=${index}`,
     text: fragment,
-    tone: "internal fragment / unresolved",
+    tone: "file note / undated",
   }));
 }
 
@@ -51,12 +51,16 @@ export default async function SourceInterference({
   const supabase = await createClient();
   const sourceSnippets = await getSourceInterferenceSnippets({
     context,
-    limit,
+    limit: Math.max(limit, 6),
     supabase,
   });
+  const launchSnippets = getLaunchInterferenceSnippets(
+    context,
+    Math.max(1, Math.ceil(limit / 2))
+  );
   const snippets = [
+    ...launchSnippets,
     ...sourceSnippets,
-    ...getLaunchInterferenceSnippets(context, limit),
     ...fallbackSnippets(context, limit),
   ].slice(0, limit);
 
@@ -68,7 +72,7 @@ export default async function SourceInterference({
 
   return (
     <aside
-      aria-label="Source interference"
+      aria-label="Found notes"
       className={`elsewhere-source-interference elsewhere-source-interference--${layoutVariant} ${className}`}
     >
       {snippets.map((snippet, index) => {

@@ -39,12 +39,12 @@ export function artifactShareDescription(artifact: ArtifactShareData) {
   return (
     artifact.description?.trim() ||
     artifact.fragment?.trim() ||
-    "An unstable archive of recordings, images, and incomplete transmissions."
+    "Halou recordings, photos, notes, and things we thought were gone."
   );
 }
 
 export function artifactShareType(artifact: ArtifactShareData) {
-  return artifact.artifact_type || artifact.kind || "Archive fragment";
+  return artifact.artifact_type || artifact.kind || "Record";
 }
 
 export function artifactShareVisualUrl(artifact: ArtifactShareData) {

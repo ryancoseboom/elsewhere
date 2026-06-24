@@ -136,7 +136,7 @@ export default function AlbumTracklist({
 
   return (
     <section className="mt-7 border-t border-stone-800 pt-5">
-      <p className="mb-4 text-[10px] uppercase tracking-[0.28em] text-stone-600">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.28em] text-stone-300">
         Tracks
       </p>
       <ol className="space-y-3">
@@ -189,7 +189,7 @@ export default function AlbumTracklist({
                   <div className="mt-3 border-l border-stone-800 pl-3">
                     {track.audioUrl && (
                       <div className="pb-4">
-                        <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-stone-600">
+                        <p className="mb-1 text-[9px] uppercase tracking-[0.18em] text-stone-300">
                           Listen
                         </p>
                         <ExclusiveAudio

@@ -7,11 +7,23 @@ type BackdropArtifact = {
   title: string;
 };
 
+type FeaturedArtifact = {
+  artifact_type: string | null;
+  description: string | null;
+  fragment: string | null;
+  id: string;
+  image_url: string | null;
+  kind: string | null;
+  slug: string;
+  title: string;
+  year: string | null;
+};
+
 const routes = [
   {
     href: "/explore",
     label: "Explore",
-    text: "Read the structure. Follow releases, recordings, and their attached signals.",
+    text: "Follow the releases, recordings, demos, photos, and paper trails.",
   },
   {
     href: "/drift",
@@ -21,9 +33,31 @@ const routes = [
   {
     href: "/float",
     label: "Float",
-    text: "Let the archive dissolve into a visual transmission.",
+    text: "Let the images, notes, and old pages dissolve into motion.",
   },
 ];
+
+function artifactType(artifact: FeaturedArtifact) {
+  return artifact.artifact_type || artifact.kind || "Record";
+}
+
+function artifactDossierCode(artifact: FeaturedArtifact) {
+  const titleSeed = artifact.title
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 4)
+    .padEnd(4, "X");
+  const checksum = Array.from(artifact.slug).reduce(
+    (total, char) => total + char.charCodeAt(0),
+    0
+  );
+
+  return `EL-${titleSeed}-${String(checksum % 997).padStart(3, "0")}`;
+}
+
+function countLabel(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
 
 export default async function Home() {
   const supabase = createPublicClient();
@@ -38,6 +72,44 @@ export default async function Home() {
     .filter((artifact) => artifact.image_url?.trim())
     .sort((left, right) => left.slug.localeCompare(right.slug))
     .slice(0, 12);
+  const { data: featuredData } = await supabase
+    .from("artifacts")
+    .select(
+      "id, slug, title, kind, artifact_type, description, fragment, image_url, year"
+    )
+    .eq("slug", "coco")
+    .eq("is_public", true)
+    .eq("discovery_visibility", "public")
+    .maybeSingle();
+  const featured = (featuredData || null) as FeaturedArtifact | null;
+  const [
+    { count: featuredTrackCount = 0 },
+    { count: featuredImageCount = 0 },
+  ] = featured
+    ? await Promise.all([
+        supabase
+          .from("artifacts")
+          .select("id", { count: "exact", head: true })
+          .eq("is_public", true)
+          .eq("discovery_visibility", "public")
+          .eq("album_id", featured.id)
+          .or("artifact_type.eq.Song,kind.eq.Song"),
+        supabase
+          .from("artifacts")
+          .select("id", { count: "exact", head: true })
+          .eq("is_public", true)
+          .eq("discovery_visibility", "public")
+          .not("image_url", "is", null)
+          .or(`parent_id.eq.${featured.id},album_id.eq.${featured.id}`),
+      ])
+    : [{ count: 0 }, { count: 0 }];
+  const featuredInventory = featured
+    ? [
+        featured.year,
+        countLabel(featuredTrackCount || 0, "track"),
+        countLabel(featuredImageCount || 0, "visual ref", "visual refs"),
+      ].filter(Boolean)
+    : [];
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#090807] px-4 py-5 text-stone-200 sm:px-6 sm:py-8">
@@ -74,9 +146,45 @@ export default async function Home() {
             Elsewhere
           </h1>
           <p className="mt-7 max-w-xl text-sm leading-7 text-stone-500 md:text-base">
-            Recordings, images, and incomplete transmissions. There is no
-            correct point of entry.
+            Over 25 years of Halou recordings, photos, fragments, false starts,
+            and things we thought were gone.
           </p>
+
+          {featured && (
+            <Link
+              href={`/artifact/${featured.slug}`}
+              className="group mt-8 grid max-w-2xl grid-cols-[5.5rem_minmax(0,1fr)] gap-4 border-y border-stone-800/80 bg-black/20 py-4 pr-4 transition hover:border-stone-600/80 hover:bg-black/35 sm:grid-cols-[7rem_minmax(0,1fr)]"
+            >
+              <div className="relative aspect-square overflow-hidden border border-stone-800 bg-stone-950">
+                {featured.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={featured.image_url}
+                    alt=""
+                    className="h-full w-full object-cover opacity-75 transition duration-700 group-hover:scale-105 group-hover:opacity-95"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-stone-900" />
+                )}
+              </div>
+              <div className="min-w-0 self-center">
+                <p className="text-[9px] uppercase tracking-[0.32em] text-stone-700">
+                  {artifactDossierCode(featured)} / {artifactType(featured)}
+                </p>
+                <p className="mt-2 font-serif text-2xl leading-none text-stone-300 transition group-hover:text-white sm:text-3xl">
+                  {featured.title}
+                </p>
+                <p className="mt-2 text-[9px] uppercase tracking-[0.22em] text-stone-600">
+                  {featuredInventory.join(" / ")}
+                </p>
+                {(featured.fragment || featured.description) && (
+                  <p className="mt-3 line-clamp-2 text-xs italic leading-5 text-stone-500 transition group-hover:text-stone-400">
+                    {featured.fragment || featured.description}
+                  </p>
+                )}
+              </div>
+            </Link>
+          )}
 
           <nav className="mt-10 grid gap-px bg-stone-800/70 sm:mt-14 md:grid-cols-3">
             {routes.map((route, index) => (
@@ -100,7 +208,7 @@ export default async function Home() {
         </section>
 
         <div className="text-[9px] uppercase tracking-[0.3em] text-stone-700">
-          <span>Archive transmission / ongoing</span>
+          <span>Old tapes / new rooms</span>
           <Link
             className="ml-4 text-stone-500 transition hover:text-stone-200"
             href="/float-studio"

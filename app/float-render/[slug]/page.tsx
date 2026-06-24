@@ -153,8 +153,8 @@ export default async function FloatRenderPage({
       supabase,
     });
     const sourceInterference: FloatInterferenceSignal[] = [
-      ...sourceInterferenceSnippets,
       ...getLaunchInterferenceSnippets(floatContext, 10),
+      ...sourceInterferenceSnippets,
     ].map((snippet) => ({
       reason: snippet.tone,
       source: snippet.sourceTitle,
@@ -238,8 +238,8 @@ export default async function FloatRenderPage({
       supabase,
     });
   const sourceInterference: FloatInterferenceSignal[] = [
-    ...sourceInterferenceSnippets,
     ...getLaunchInterferenceSnippets(sourceInterferenceContext, 8),
+    ...sourceInterferenceSnippets,
   ].map((snippet) => ({
     reason: snippet.tone,
     source: snippet.sourceTitle,
