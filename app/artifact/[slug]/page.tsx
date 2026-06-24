@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
@@ -34,6 +35,14 @@ import ExclusiveAudio from "@/components/ExclusiveAudio";
 import SpotifyTrackEmbed from "@/components/SpotifyTrackEmbed";
 import SourceInterference from "@/components/SourceInterference";
 import { archiveTexture, archiveTextureSet } from "@/lib/archive-textures";
+import {
+  artifactShareDescription,
+  artifactShareImageSize,
+  artifactShareImageUrl,
+  artifactShareType,
+  getArtifactShareData,
+} from "@/lib/artifact-share";
+import { siteUrl } from "@/lib/site";
 
 const ELSEWHERE_ATMOSPHERE_V2 = true;
 export const dynamic = "force-dynamic";
@@ -189,6 +198,62 @@ function shouldRevealHiddenArtifact(slug: string) {
   );
 
   return score % 11 === 0;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const artifact = await getArtifactShareData(slug);
+
+  if (!artifact) {
+    return {
+      title: "Elsewhere",
+    };
+  }
+
+  const description = artifactShareDescription(artifact);
+  const image = artifactShareImageUrl(artifact.slug);
+  const imageAlt = `${artifact.title} / Elsewhere`;
+  const url = new URL(`/artifact/${artifact.slug}`, siteUrl());
+
+  return {
+    title: artifact.title,
+    description,
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      title: artifact.title,
+      description,
+      type: "article",
+      url,
+      siteName: "Elsewhere",
+      images: [
+        {
+          url: image,
+          ...artifactShareImageSize,
+          alt: imageAlt,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: artifact.title,
+      description,
+      images: [
+        {
+          url: image,
+          alt: imageAlt,
+        },
+      ],
+    },
+    other: {
+      "elsewhere:artifact_type": artifactShareType(artifact),
+    },
+  };
 }
 
 function ChildLinkList({
