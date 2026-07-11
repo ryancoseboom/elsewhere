@@ -784,6 +784,9 @@ export default async function BackroomPage({
                 Source review
               </ActionLink>
               <ActionLink href="/backroom/media-labels">Media labels</ActionLink>
+              <ActionLink href="/backroom/audio-migration">
+                Audio migration
+              </ActionLink>
               <ActionLink href="/backroom/moods">Song moods</ActionLink>
               <ActionLink href="/backroom/drift-moods">Drift times</ActionLink>
             </div>
